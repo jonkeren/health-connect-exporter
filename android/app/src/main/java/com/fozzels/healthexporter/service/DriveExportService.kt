@@ -1,14 +1,16 @@
 package com.fozzels.healthexporter.service
 
+import android.accounts.AccountManager
 import android.content.Context
-import com.google.android.gms.auth.GoogleAuthUtil
-import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.fozzels.healthexporter.data.SettingsRepository
 import com.fozzels.healthexporter.model.HealthExportData
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -20,7 +22,8 @@ import javax.inject.Singleton
 @Singleton
 class DriveExportService @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val settingsRepository: SettingsRepository
 ) {
     private val json = Json { prettyPrint = false; encodeDefaults = true }
 
@@ -37,7 +40,7 @@ class DriveExportService @Inject constructor(
         data: HealthExportData
     ): Result<Unit> {
         val accessToken = getAccessToken() ?: return Result.failure(
-            IllegalStateException("Not signed in to Google. Please sign in via Settings.")
+            IllegalStateException("Not signed in to Google. Please select an account via Settings.")
         )
 
         val fileName = "health_$exportDate.json"
@@ -88,16 +91,23 @@ class DriveExportService @Inject constructor(
         }
     }
 
-    private suspend fun getAccessToken(): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return@withContext null
-        // Check that the Drive scope was actually granted
-        val hasDriveScope = GoogleSignIn.hasPermissions(
-            account,
-            com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file")
-        )
-        if (!hasDriveScope) return@withContext null
-        return@withContext try {
-            GoogleAuthUtil.getToken(context, account.account!!, DRIVE_SCOPE)
+    private suspend fun getAccessToken(): String? = withContext(Dispatchers.IO) {
+        try {
+            val accountManager = AccountManager.get(context)
+            val accounts = accountManager.getAccountsByType("com.google")
+            if (accounts.isEmpty()) return@withContext null
+            val settingsEmail = settingsRepository.settings.first().driveAccountEmail
+            val account = if (settingsEmail.isNotBlank()) {
+                accounts.firstOrNull { it.name == settingsEmail } ?: accounts[0]
+            } else accounts[0]
+
+            val future = accountManager.getAuthToken(
+                account,
+                DRIVE_SCOPE,
+                null, null, null, null
+            )
+            val bundle = future.result
+            bundle.getString(AccountManager.KEY_AUTHTOKEN)
         } catch (e: Exception) {
             null
         }

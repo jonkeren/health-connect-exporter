@@ -1,12 +1,9 @@
 package com.fozzels.healthexporter.ui.viewmodel
 
+import android.accounts.AccountManager
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.Scope
 import com.fozzels.healthexporter.data.SettingsRepository
 import com.fozzels.healthexporter.model.ExportSettings
 import com.fozzels.healthexporter.model.ExportTarget
@@ -25,7 +22,8 @@ data class SettingsUiState(
     val snackbarMessage: String? = null,
     val driveFolders: List<DriveFolder> = emptyList(),
     val isLoadingFolders: Boolean = false,
-    val showFolderPicker: Boolean = false
+    val showFolderPicker: Boolean = false,
+    val availableAccounts: List<String> = emptyList()
 )
 
 @HiltViewModel
@@ -39,6 +37,7 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        _uiState.update { it.copy(availableAccounts = getAvailableGoogleAccounts()) }
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _uiState.update { it.copy(settings = settings) }
@@ -46,48 +45,31 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun getGoogleSignInClient(): GoogleSignInClient {
-        val driveScope = Scope("https://www.googleapis.com/auth/drive.file")
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestEmail()
-            .requestScopes(driveScope)
-            .requestServerAuthCode("68389848221-84ec845seenrstmlk81bl58045buschn.apps.googleusercontent.com")
-            .build()
-        return GoogleSignIn.getClient(context, gso)
+    fun getAvailableGoogleAccounts(): List<String> {
+        val accountManager = AccountManager.get(context)
+        return accountManager.getAccountsByType("com.google").map { it.name }
     }
 
-    fun needsDriveSignIn(): Boolean {
-        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return true
-        return !GoogleSignIn.hasPermissions(
-            account,
-            Scope("https://www.googleapis.com/auth/drive.file")
-        )
-    }
-
-    fun onGoogleSignInSuccess(email: String) {
+    fun selectGoogleAccount(email: String) {
         viewModelScope.launch {
             settingsRepository.updateDriveAccount(email)
             _uiState.update {
                 it.copy(
                     settings = it.settings.copy(driveAccountEmail = email),
-                    snackbarMessage = "Signed in as $email"
+                    snackbarMessage = "Account selected: $email"
                 )
             }
+            loadDriveFolders()
         }
-    }
-
-    fun onGoogleSignInFailed(error: String) {
-        _uiState.update { it.copy(snackbarMessage = "Sign-in failed: $error") }
     }
 
     fun signOutGoogle() {
         viewModelScope.launch {
-            getGoogleSignInClient().signOut()
             settingsRepository.updateDriveAccount("")
             _uiState.update {
                 it.copy(
-                    settings = it.settings.copy(driveAccountEmail = ""),
-                    snackbarMessage = "Signed out from Google"
+                    settings = it.settings.copy(driveAccountEmail = "", driveFolderId = ""),
+                    snackbarMessage = "Google account removed"
                 )
             }
         }

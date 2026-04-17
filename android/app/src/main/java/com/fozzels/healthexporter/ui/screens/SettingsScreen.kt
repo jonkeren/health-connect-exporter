@@ -1,7 +1,5 @@
 package com.fozzels.healthexporter.ui.screens
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,9 +16,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInStatusCodes
-import com.google.android.gms.common.api.ApiException
 import com.fozzels.healthexporter.model.ExportTarget
 import com.fozzels.healthexporter.ui.viewmodel.SettingsViewModel
 
@@ -34,25 +29,6 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         uiState.snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.dismissSnackbar()
-        }
-    }
-
-    val googleSignInLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        try {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            val account = task.getResult(ApiException::class.java)
-            viewModel.onGoogleSignInSuccess(account.email ?: "Unknown")
-            // Auto-load folders after sign-in if Drive target is selected
-            viewModel.loadDriveFolders()
-        } catch (e: ApiException) {
-            val msg = when (e.statusCode) {
-                GoogleSignInStatusCodes.SIGN_IN_CANCELLED -> "Sign-in cancelled"
-                GoogleSignInStatusCodes.NETWORK_ERROR -> "Network error"
-                else -> "Sign-in error: ${e.statusCode}"
-            }
-            viewModel.onGoogleSignInFailed(msg)
         }
     }
 
@@ -217,16 +193,25 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Google Drive Configuration", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
 
+                            val accounts = uiState.availableAccounts
                             if (uiState.settings.driveAccountEmail.isBlank()) {
-                                Button(
-                                    onClick = {
-                                        googleSignInLauncher.launch(viewModel.getGoogleSignInClient().signInIntent)
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Filled.AccountCircle, null)
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Sign in with Google")
+                                if (accounts.isEmpty()) {
+                                    Text(
+                                        "No Google accounts found on device",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                } else {
+                                    Text("Select Google account:", style = MaterialTheme.typography.labelMedium)
+                                    accounts.forEach { email ->
+                                        OutlinedButton(
+                                            onClick = { viewModel.selectGoogleAccount(email) },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(Icons.Filled.AccountCircle, null)
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(email)
+                                        }
+                                    }
                                 }
                             } else {
                                 Row(
@@ -249,16 +234,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                                     "Folder ID: ${uiState.settings.driveFolderId.take(20)}..."
 
                                 OutlinedButton(
-                                    onClick = {
-                                        if (viewModel.needsDriveSignIn()) {
-                                            // Re-sign-in to request Drive scope
-                                            googleSignInLauncher.launch(
-                                                viewModel.getGoogleSignInClient().signInIntent
-                                            )
-                                        } else {
-                                            viewModel.loadDriveFolders()
-                                        }
-                                    },
+                                    onClick = { viewModel.loadDriveFolders() },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(Icons.Filled.Folder, null)
