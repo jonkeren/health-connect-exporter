@@ -21,10 +21,7 @@ class HealthConnectManager @Inject constructor(
     private val healthConnectClient by lazy { HealthConnectClient.getOrCreate(context) }
 
     val isAvailable: Boolean
-        get() = try {
-            HealthConnectClient.getOrCreate(context)
-            true
-        } catch (e: Exception) { false }
+        get() = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
     companion object {
         val PERMISSIONS: Set<String> = setOf(
@@ -45,12 +42,12 @@ class HealthConnectManager @Inject constructor(
         )
 
         fun sleepStageToString(stage: Int): String = when (stage) {
-            1 -> "AWAKE"
-            2 -> "SLEEPING"
-            3 -> "OUT_OF_BED"
-            4 -> "LIGHT"
-            5 -> "DEEP"
-            6 -> "REM"
+            SleepSessionRecord.STAGE_TYPE_AWAKE -> "AWAKE"
+            SleepSessionRecord.STAGE_TYPE_SLEEPING -> "SLEEPING"
+            SleepSessionRecord.STAGE_TYPE_OUT_OF_BED -> "OUT_OF_BED"
+            SleepSessionRecord.STAGE_TYPE_LIGHT -> "LIGHT"
+            SleepSessionRecord.STAGE_TYPE_DEEP -> "DEEP"
+            SleepSessionRecord.STAGE_TYPE_REM -> "REM"
             else -> "UNKNOWN_$stage"
         }
 
@@ -114,7 +111,7 @@ class HealthConnectManager @Inject constructor(
     }
 
     fun requestPermissionsActivityContract() =
-        androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
+        healthConnectClient.permissionController.createRequestPermissionResultContract()
 
     suspend fun checkPermissions(): Set<String> = withContext(Dispatchers.IO) {
         healthConnectClient.permissionController.getGrantedPermissions()
@@ -193,7 +190,17 @@ class HealthConnectManager @Inject constructor(
     private suspend fun readSleep(timeRange: TimeRangeFilter): List<SleepEntry> = try {
         healthConnectClient.readRecords(ReadRecordsRequest(SleepSessionRecord::class, timeRange))
             .records.flatMap { r ->
-                listOf(SleepEntry(start = r.startTime.toString(), end = r.endTime.toString()))
+                if (r.stages.isEmpty()) {
+                    listOf(SleepEntry(start = r.startTime.toString(), end = r.endTime.toString()))
+                } else {
+                    r.stages.map { s ->
+                        SleepEntry(
+                            start = s.startTime.toString(),
+                            end = s.endTime.toString(),
+                            stage = sleepStageToString(s.stage)
+                        )
+                    }
+                }
             }
     } catch (e: Exception) { emptyList() }
 
