@@ -2,6 +2,7 @@ package com.fozzels.healthexporter.data
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
 import androidx.health.connect.client.request.ReadRecordsRequest
@@ -111,7 +112,7 @@ class HealthConnectManager @Inject constructor(
     }
 
     fun requestPermissionsActivityContract() =
-        healthConnectClient.permissionController.createRequestPermissionResultContract()
+        PermissionController.createRequestPermissionResultContract()
 
     suspend fun checkPermissions(): Set<String> = withContext(Dispatchers.IO) {
         healthConnectClient.permissionController.getGrantedPermissions()
