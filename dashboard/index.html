@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Health Connect Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js from CDN — no build step needed -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+    </svg>
+    Health Connect Dashboard
+  </h1>
+  <span class="last-refresh" id="lastRefresh">Loading...</span>
+</header>
+
+<div class="container">
+
+  <!-- Error banner -->
+  <div id="errorBanner" class="error-banner" style="display:none"></div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <label for="rangePreset">Range:</label>
+    <select id="rangePreset" onchange="onPresetChange()">
+      <option value="7">Last 7 days</option>
+      <option value="14">Last 14 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="custom">Custom</option>
+    </select>
+
+    <span id="customDates" style="display:none; gap:8px; align-items:center; display:none">
+      <label for="fromDate">From:</label>
+      <input type="date" id="fromDate" />
+      <label for="toDate">To:</label>
+      <input type="date" id="toDate" />
+    </span>
+
+    <button class="btn btn-primary" onclick="loadData()">Refresh</button>
+    <button class="btn btn-outline" onclick="exportCsv()">Export CSV</button>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="label">Avg Daily Steps</div>
+      <div class="value" id="avgSteps">—</div>
+      <div class="unit">steps/day</div>
+    </div>
+    <div class="summary-card">
+      <div class="label">Avg Heart Rate</div>
+      <div class="value" id="avgHR">—</div>
+      <div class="unit">bpm</div>
+    </div>
+    <div class="summary-card" style="border-left-color:#6366f1">
+      <div class="label">Total Sleep</div>
+      <div class="value" id="totalSleep">—</div>
+      <div class="unit">hours (period)</div>
+    </div>
+    <div class="summary-card" style="border-left-color:#f59e0b">
+      <div class="label">Avg Weight</div>
+      <div class="value" id="avgWeight">—</div>
+      <div class="unit">kg</div>
+    </div>
+    <div class="summary-card" style="border-left-color:#ef4444">
+      <div class="label">Avg Calories</div>
+      <div class="value" id="avgCalories">—</div>
+      <div class="unit">kcal/day</div>
+    </div>
+    <div class="summary-card" style="border-left-color:#06b6d4">
+      <div class="label">Avg SpO2</div>
+      <div class="value" id="avgSpO2">—</div>
+      <div class="unit">%</div>
+    </div>
+    <div class="summary-card" style="border-left-color:#8b5cf6">
+      <div class="label">Total Distance</div>
+      <div class="value" id="totalDistance">—</div>
+      <div class="unit">km (period)</div>
+    </div>
+    <div class="summary-card" style="border-left-color:#ec4899">
+      <div class="label">Export Days</div>
+      <div class="value" id="exportDays">—</div>
+      <div class="unit">records available</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h3>📶 Daily Steps</h3>
+      <canvas id="stepsChart" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>❤️ Heart Rate</h3>
+      <canvas id="heartRateChart" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>🌙 Sleep Duration</h3>
+      <canvas id="sleepChart" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>⚖️ Weight</h3>
+      <canvas id="weightChart" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>🔥 Calories Burned</h3>
+      <canvas id="caloriesChart" height="200"></canvas>
+    </div>
+    <div class="chart-card">
+      <h3>💧 SpO2</h3>
+      <canvas id="spo2Chart" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Data Table -->
+  <div class="table-card">
+    <h3>Daily Data Table</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Steps</th>
+            <th>Avg HR (bpm)</th>
+            <th>Sleep (h)</th>
+            <th>Weight (kg)</th>
+            <th>Calories</th>
+            <th>Distance (km)</th>
+            <th>SpO2 (%)</th>
+            <th>Exercises</th>
+          </tr>
+        </thead>
+        <tbody id="dataTableBody">
+          <tr><td colspan="9" class="no-data">Loading data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay" class="loading-overlay" style="display:none">
+  <div class="spinner"></div>
+</div>
+
+<script src="dashboard.js"></script>
+</body>
+</html>

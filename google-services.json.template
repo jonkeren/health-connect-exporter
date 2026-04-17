@@ -1,0 +1,89 @@
+{
+  "project_info": {
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_PROJECT_ID",
+    "storage_bucket": "YOUR_PROJECT_ID.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:YOUR_APP_HASH",
+        "android_client_info": {
+          "package_name": "com.fozzels.healthexporter"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+          "client_type": 3
+        },
+        {
+          "client_id": "YOUR_ANDROID_CLIENT_ID.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fozzels.healthexporter",
+            "certificate_hash": "YOUR_SHA1_CERTIFICATE_FINGERPRINT"
+          }
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "YOUR_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// HOW TO SET UP GOOGLE DRIVE OAUTH
+// ════════════════════════════════════════════════════════════════════════════
+//
+// 1. Go to https://console.cloud.google.com/
+//
+// 2. Create a new project (or use an existing one).
+//
+// 3. Enable the Google Drive API:
+//    APIs & Services → Library → search "Google Drive API" → Enable
+//
+// 4. Create OAuth 2.0 credentials:
+//    APIs & Services → Credentials → Create Credentials → OAuth client ID
+//    - Application type: Android
+//    - Package name: com.fozzels.healthexporter
+//    - SHA-1 certificate fingerprint: run this command to get it:
+//      ./gradlew signingReport
+//      (or: keytool -keystore ~/.android/debug.keystore -list -v)
+//
+// 5. Also create a Web application OAuth client (needed for auth flow):
+//    - Application type: Web application
+//    - Note the Client ID — this is YOUR_WEB_CLIENT_ID
+//
+// 6. Download the google-services.json for your Android app:
+//    Project Overview → Your Android app → Download google-services.json
+//    Place it at: android/app/google-services.json
+//
+// 7. Update android/app/build.gradle.kts to apply the Google services plugin:
+//    plugins {
+//        ...
+//        id("com.google.gms.google-services")
+//    }
+//    And add to android/build.gradle.kts:
+//    alias(libs.plugins.google.services) apply false
+//    And add to libs.versions.toml:
+//    google-services = { id = "com.google.gms.google-services", version = "4.4.1" }
+//
+// ════════════════════════════════════════════════════════════════════════════
+// NOTE: The app works without Google Drive — you can use the HTTP endpoint
+// option instead, which requires no additional setup.
+// ════════════════════════════════════════════════════════════════════════════

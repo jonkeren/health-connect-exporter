@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Heart icon representing health -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,72 C54,72 28,56 28,40 C28,31.2 35.2,24 44,24 C48.4,24 52.4,25.9 55.3,29 C55.5,29.2 55.7,29.4 55.9,29.6 L54,31.5 L52.1,29.6 C52.3,29.4 52.5,29.2 52.7,29 C49.6,25.9 53.6,24 58,24 C66.8,24 74,31.2 74,40 C74,56 54,72 54,72Z" />
+    <!-- Arrow up for export -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,78 L54,90 M48,84 L54,78 L60,84"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round" />
+</vector>

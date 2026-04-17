@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Health Connect Exporter</string>
+    <string name="notification_channel_name">Health Export</string>
+    <string name="notification_channel_desc">Notifications for health data export status</string>
+</resources>
