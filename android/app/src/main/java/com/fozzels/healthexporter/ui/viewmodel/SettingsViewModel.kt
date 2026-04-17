@@ -22,8 +22,7 @@ data class SettingsUiState(
     val snackbarMessage: String? = null,
     val driveFolders: List<DriveFolder> = emptyList(),
     val isLoadingFolders: Boolean = false,
-    val showFolderPicker: Boolean = false,
-    val availableAccounts: List<String> = emptyList()
+    val showFolderPicker: Boolean = false
 )
 
 @HiltViewModel
@@ -37,7 +36,6 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
-        _uiState.update { it.copy(availableAccounts = getAvailableGoogleAccounts()) }
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _uiState.update { it.copy(settings = settings) }
@@ -45,9 +43,12 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun getAvailableGoogleAccounts(): List<String> {
-        val accountManager = AccountManager.get(context)
-        return accountManager.getAccountsByType("com.google").map { it.name }
+    fun getAccountPickerIntent(): android.content.Intent {
+        return AccountManager.newChooseAccountIntent(
+            null, null,
+            arrayOf("com.google"),
+            null, null, null, null
+        )
     }
 
     fun selectGoogleAccount(email: String) {

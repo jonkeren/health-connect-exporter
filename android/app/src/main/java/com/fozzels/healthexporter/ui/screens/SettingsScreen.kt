@@ -1,5 +1,7 @@
 package com.fozzels.healthexporter.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -24,6 +26,17 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showPassword by remember { mutableStateOf(false) }
+
+    val accountPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val email = result.data?.getStringExtra(android.accounts.AccountManager.KEY_ACCOUNT_NAME)
+            if (email != null) {
+                viewModel.selectGoogleAccount(email)
+            }
+        }
+    }
 
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let {
@@ -193,25 +206,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text("Google Drive Configuration", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
 
-                            val accounts = uiState.availableAccounts
                             if (uiState.settings.driveAccountEmail.isBlank()) {
-                                if (accounts.isEmpty()) {
-                                    Text(
-                                        "No Google accounts found on device",
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                } else {
-                                    Text("Select Google account:", style = MaterialTheme.typography.labelMedium)
-                                    accounts.forEach { email ->
-                                        OutlinedButton(
-                                            onClick = { viewModel.selectGoogleAccount(email) },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Icon(Icons.Filled.AccountCircle, null)
-                                            Spacer(Modifier.width(8.dp))
-                                            Text(email)
-                                        }
-                                    }
+                                Button(
+                                    onClick = { accountPickerLauncher.launch(viewModel.getAccountPickerIntent()) },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Filled.AccountCircle, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Select Google Account")
                                 }
                             } else {
                                 Row(
