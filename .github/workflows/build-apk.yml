@@ -24,6 +24,9 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Print debug keystore SHA-1 (needed for Google OAuth setup)
+        run: keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android 2>/dev/null | grep -E 'SHA1|SHA-1'
+
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
