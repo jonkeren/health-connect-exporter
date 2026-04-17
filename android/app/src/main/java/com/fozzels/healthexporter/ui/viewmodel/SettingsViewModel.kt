@@ -51,6 +51,7 @@ class SettingsViewModel @Inject constructor(
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .requestScopes(driveScope)
+            .requestServerAuthCode("68389848221-84ec845seenrstmlk81bl58045buschn.apps.googleusercontent.com")
             .build()
         return GoogleSignIn.getClient(context, gso)
     }
