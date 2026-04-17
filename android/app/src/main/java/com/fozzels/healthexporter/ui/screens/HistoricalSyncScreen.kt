@@ -198,7 +198,7 @@ fun HistoricalSyncScreen(
                         }
                         Spacer(Modifier.height(8.dp))
                         // Two-column grid of checkboxes
-                        val types = HealthDataType.values()
+                        val types = HealthDataType.values().toList()
                         types.chunked(2).forEach { rowTypes ->
                             Row(modifier = Modifier.fillMaxWidth()) {
                                 rowTypes.forEach { type ->

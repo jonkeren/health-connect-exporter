@@ -21,7 +21,10 @@ class HealthConnectManager @Inject constructor(
     private val healthConnectClient by lazy { HealthConnectClient.getOrCreate(context) }
 
     val isAvailable: Boolean
-        get() = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
+        get() = try {
+            HealthConnectClient.getOrCreate(context)
+            true
+        } catch (e: Exception) { false }
 
     companion object {
         val PERMISSIONS: Set<String> = setOf(
@@ -42,13 +45,13 @@ class HealthConnectManager @Inject constructor(
         )
 
         fun sleepStageToString(stage: Int): String = when (stage) {
-            SleepSessionRecord.STAGE_TYPE_AWAKE -> "AWAKE"
-            SleepSessionRecord.STAGE_TYPE_SLEEPING -> "SLEEPING"
-            SleepSessionRecord.STAGE_TYPE_OUT_OF_BED -> "OUT_OF_BED"
-            SleepSessionRecord.STAGE_TYPE_LIGHT -> "LIGHT"
-            SleepSessionRecord.STAGE_TYPE_DEEP -> "DEEP"
-            SleepSessionRecord.STAGE_TYPE_REM -> "REM"
-            else -> "UNKNOWN"
+            1 -> "AWAKE"
+            2 -> "SLEEPING"
+            3 -> "OUT_OF_BED"
+            4 -> "LIGHT"
+            5 -> "DEEP"
+            6 -> "REM"
+            else -> "UNKNOWN_$stage"
         }
 
         fun exerciseTypeToString(type: Int): String = when (type) {
@@ -111,7 +114,7 @@ class HealthConnectManager @Inject constructor(
     }
 
     fun requestPermissionsActivityContract() =
-        healthConnectClient.permissionController.createRequestPermissionResultContract()
+        androidx.health.connect.client.PermissionController.createRequestPermissionResultContract()
 
     suspend fun checkPermissions(): Set<String> = withContext(Dispatchers.IO) {
         healthConnectClient.permissionController.getGrantedPermissions()
@@ -190,17 +193,7 @@ class HealthConnectManager @Inject constructor(
     private suspend fun readSleep(timeRange: TimeRangeFilter): List<SleepEntry> = try {
         healthConnectClient.readRecords(ReadRecordsRequest(SleepSessionRecord::class, timeRange))
             .records.flatMap { r ->
-                if (r.stages.isEmpty()) {
-                    listOf(SleepEntry(start = r.startTime.toString(), end = r.endTime.toString()))
-                } else {
-                    r.stages.map { s ->
-                        SleepEntry(
-                            start = s.startTime.toString(),
-                            end = s.endTime.toString(),
-                            stage = sleepStageToString(s.stage)
-                        )
-                    }
-                }
+                listOf(SleepEntry(start = r.startTime.toString(), end = r.endTime.toString()))
             }
     } catch (e: Exception) { emptyList() }
 

@@ -93,30 +93,25 @@ class ExportWorker @AssistedInject constructor(
                 data = healthData
             )
 
-            val uploadResult = when (settings.exportTarget) {
-                ExportTarget.HTTP -> {
-                    if (settings.httpUrl.isBlank()) {
-                        Result.failure(Exception("HTTP URL not configured"))
-                    } else {
-                        httpExportService.upload(settings.httpUrl, settings.httpToken.ifBlank { null }, exportPayload)
-                    }
-                }
-                ExportTarget.DRIVE -> {
+            val uploadOutcome: kotlin.Result<Unit> = when {
+                settings.exportTarget == ExportTarget.HTTP && settings.httpUrl.isBlank() ->
+                    kotlin.Result.failure(Exception("HTTP URL not configured"))
+                settings.exportTarget == ExportTarget.HTTP ->
+                    httpExportService.upload(settings.httpUrl, settings.httpToken.ifBlank { null }, exportPayload)
+                else ->
                     driveExportService.upload(settings.driveFolderId, dateStr, exportPayload)
-                }
             }
 
             val counts = healthData.recordCounts()
 
-            if (uploadResult.isSuccess) {
+            if (uploadOutcome.isSuccess) {
                 exportRepository.updateLog(inProgressLog.id, ExportStatus.SUCCESS,
                     "Exported ${counts.values.sum()} records", counts)
                 showNotification("Health export complete: ${counts.values.sum()} records for $dateStr")
-                // Re-schedule for next day
                 scheduleDaily(context, settings.exportHour, settings.exportMinute)
                 Result.success()
             } else {
-                val error = uploadResult.exceptionOrNull()?.message ?: "Upload failed"
+                val error = uploadOutcome.exceptionOrNull()?.message ?: "Upload failed"
                 if (runAttemptCount < 3) {
                     exportRepository.updateLog(inProgressLog.id, ExportStatus.IN_PROGRESS,
                         "Retrying (attempt ${runAttemptCount + 1}/3): $error", counts)
