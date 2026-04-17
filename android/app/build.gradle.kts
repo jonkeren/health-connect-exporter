@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.fozzels.healthexporter"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.fozzels.healthexporter"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -48,7 +48,7 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.11"
+        kotlinCompilerExtensionVersion = "1.5.15"
     }
 
     packaging {
