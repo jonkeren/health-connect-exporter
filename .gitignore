@@ -7,3 +7,4 @@ android/app/build/
 *.aab
 local.properties
 .DS_Store
+!android/gradle/wrapper/gradle-wrapper.jar
