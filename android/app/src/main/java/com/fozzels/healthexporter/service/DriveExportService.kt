@@ -88,9 +88,15 @@ class DriveExportService @Inject constructor(
         }
     }
 
-    private fun getAccessToken(): String? {
-        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return null
-        return try {
+    private suspend fun getAccessToken(): String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return@withContext null
+        // Check that the Drive scope was actually granted
+        val hasDriveScope = GoogleSignIn.hasPermissions(
+            account,
+            com.google.android.gms.common.api.Scope("https://www.googleapis.com/auth/drive.file")
+        )
+        if (!hasDriveScope) return@withContext null
+        return@withContext try {
             GoogleAuthUtil.getToken(context, account.account!!, DRIVE_SCOPE)
         } catch (e: Exception) {
             null

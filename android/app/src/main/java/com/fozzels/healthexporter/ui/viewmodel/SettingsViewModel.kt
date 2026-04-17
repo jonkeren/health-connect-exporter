@@ -47,11 +47,20 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun getGoogleSignInClient(): GoogleSignInClient {
+        val driveScope = Scope("https://www.googleapis.com/auth/drive.file")
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
-            .requestScopes(Scope("https://www.googleapis.com/auth/drive.file"))
+            .requestScopes(driveScope)
             .build()
         return GoogleSignIn.getClient(context, gso)
+    }
+
+    fun needsDriveSignIn(): Boolean {
+        val account = GoogleSignIn.getLastSignedInAccount(context) ?: return true
+        return !GoogleSignIn.hasPermissions(
+            account,
+            Scope("https://www.googleapis.com/auth/drive.file")
+        )
     }
 
     fun onGoogleSignInSuccess(email: String) {

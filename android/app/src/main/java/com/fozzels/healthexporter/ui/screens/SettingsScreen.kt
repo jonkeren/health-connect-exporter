@@ -44,6 +44,8 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             val account = task.getResult(ApiException::class.java)
             viewModel.onGoogleSignInSuccess(account.email ?: "Unknown")
+            // Auto-load folders after sign-in if Drive target is selected
+            viewModel.loadDriveFolders()
         } catch (e: ApiException) {
             val msg = when (e.statusCode) {
                 GoogleSignInStatusCodes.SIGN_IN_CANCELLED -> "Sign-in cancelled"
@@ -247,7 +249,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                                     "Folder ID: ${uiState.settings.driveFolderId.take(20)}..."
 
                                 OutlinedButton(
-                                    onClick = viewModel::loadDriveFolders,
+                                    onClick = {
+                                        if (viewModel.needsDriveSignIn()) {
+                                            // Re-sign-in to request Drive scope
+                                            googleSignInLauncher.launch(
+                                                viewModel.getGoogleSignInClient().signInIntent
+                                            )
+                                        } else {
+                                            viewModel.loadDriveFolders()
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(Icons.Filled.Folder, null)
