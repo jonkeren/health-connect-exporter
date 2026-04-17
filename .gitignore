@@ -1,0 +1,9 @@
+dashboard/node_modules/
+dashboard/data/
+android/.gradle/
+android/build/
+android/app/build/
+*.apk
+*.aab
+local.properties
+.DS_Store
