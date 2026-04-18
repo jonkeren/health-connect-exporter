@@ -10,6 +10,8 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Singleton
 class HttpExportService @Inject constructor(
@@ -32,7 +34,7 @@ class HttpExportService @Inject constructor(
         }
 
         return try {
-            val response = okHttpClient.newCall(requestBuilder.build()).execute()
+            val response = withContext(Dispatchers.IO) { okHttpClient.newCall(requestBuilder.build()).execute() }
             if (response.isSuccessful) {
                 response.close()
                 Result.success(Unit)
