@@ -9,6 +9,9 @@ import com.fozzels.healthexporter.model.ExportSettings
 import com.fozzels.healthexporter.model.ExportTarget
 import com.fozzels.healthexporter.service.DriveExportService
 import com.fozzels.healthexporter.service.DriveFolder
+import com.fozzels.healthexporter.service.HttpExportService
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import com.fozzels.healthexporter.worker.ExportWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -19,6 +22,7 @@ import javax.inject.Inject
 data class SettingsUiState(
     val settings: ExportSettings = ExportSettings(),
     val isSaving: Boolean = false,
+    val isTesting: Boolean = false,
     val snackbarMessage: String? = null,
     val driveFolders: List<DriveFolder> = emptyList(),
     val isLoadingFolders: Boolean = false,
@@ -29,7 +33,8 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
-    private val driveExportService: DriveExportService
+    private val driveExportService: DriveExportService,
+    private val okHttpClient: OkHttpClient
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -149,6 +154,39 @@ class SettingsViewModel @Inject constructor(
 
             _uiState.update {
                 it.copy(isSaving = false, snackbarMessage = "Settings saved")
+            }
+        }
+    }
+
+    fun testConnection() {
+        val url = _uiState.value.settings.httpUrl.trim()
+        if (url.isBlank()) {
+            _uiState.update { it.copy(snackbarMessage = "Enter a URL first") }
+            return
+        }
+        // Derive health check URL: replace /api/upload with /api/health, or append /api/health
+        val healthUrl = when {
+            url.endsWith("/api/upload") -> url.replace("/api/upload", "/api/health")
+            url.endsWith("/") -> url + "api/health"
+            else -> url.substringBeforeLast("/api/", url).trimEnd('/') + "/api/health"
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTesting = true, snackbarMessage = null) }
+            try {
+                val request = Request.Builder().url(healthUrl).get().build()
+                val response = okHttpClient.newCall(request).execute()
+                val body = response.body?.string()?.take(200) ?: ""
+                response.close()
+                if (response.isSuccessful) {
+                    _uiState.update { it.copy(isTesting = false, snackbarMessage = "✅ Connected! Server OK") }
+                } else {
+                    _uiState.update { it.copy(isTesting = false, snackbarMessage = "❌ HTTP ${response.code}: $body") }
+                }
+            } catch (e: Exception) {
+                val msg = e.message?.takeIf { it.isNotBlank() }
+                    ?: e.cause?.message?.takeIf { it.isNotBlank() }
+                    ?: e.javaClass.simpleName
+                _uiState.update { it.copy(isTesting = false, snackbarMessage = "❌ Connection failed: $msg") }
             }
         }
     }

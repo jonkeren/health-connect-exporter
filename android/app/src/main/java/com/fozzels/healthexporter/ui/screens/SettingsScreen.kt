@@ -177,6 +177,21 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
+                            OutlinedButton(
+                                onClick = viewModel::testConnection,
+                                enabled = !uiState.isTesting,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (uiState.isTesting) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Testing...")
+                                } else {
+                                    Icon(Icons.Filled.Sync, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Test Connection")
+                                }
+                            }
                             OutlinedTextField(
                                 value = uiState.settings.httpToken,
                                 onValueChange = viewModel::updateHttpToken,
