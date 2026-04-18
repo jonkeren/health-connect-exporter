@@ -10,6 +10,8 @@ import com.fozzels.healthexporter.model.ExportTarget
 import com.fozzels.healthexporter.service.DriveExportService
 import com.fozzels.healthexporter.service.DriveFolder
 import com.fozzels.healthexporter.service.HttpExportService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import com.fozzels.healthexporter.worker.ExportWorker
@@ -174,7 +176,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.update { it.copy(isTesting = true, snackbarMessage = null) }
             try {
                 val request = Request.Builder().url(healthUrl).get().build()
-                val response = okHttpClient.newCall(request).execute()
+                val response = withContext(Dispatchers.IO) { okHttpClient.newCall(request).execute() }
                 val body = response.body?.string()?.take(200) ?: ""
                 response.close()
                 if (response.isSuccessful) {
