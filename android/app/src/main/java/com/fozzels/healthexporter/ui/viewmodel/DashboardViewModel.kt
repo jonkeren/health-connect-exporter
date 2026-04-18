@@ -118,17 +118,24 @@ class DashboardViewModel @Inject constructor(
                         )
                     }
                 } else {
-                    val error = result.exceptionOrNull()?.message ?: "Unknown error"
+                    val ex = result.exceptionOrNull()
+                val error = ex?.message?.takeIf { it.isNotBlank() }
+                    ?: ex?.cause?.message?.takeIf { it.isNotBlank() }
+                    ?: ex?.javaClass?.simpleName
+                    ?: "Unknown error"
                     exportRepository.updateLog(inProgressLog.id, ExportStatus.FAILURE, error, counts)
                     _uiState.update {
                         it.copy(exportInProgress = false, snackbarMessage = "Export failed: $error")
                     }
                 }
             } catch (e: Exception) {
+                val msg = e.message?.takeIf { it.isNotBlank() }
+                    ?: e.cause?.message?.takeIf { it.isNotBlank() }
+                    ?: e.javaClass.simpleName
                 _uiState.update {
                     it.copy(
                         exportInProgress = false,
-                        snackbarMessage = "Export error: ${e.message}"
+                        snackbarMessage = "Export error: $msg"
                     )
                 }
             }
