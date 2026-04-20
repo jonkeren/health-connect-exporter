@@ -19,6 +19,7 @@ import com.fozzels.healthexporter.data.HealthConnectManager
 import com.fozzels.healthexporter.ui.viewmodel.PermissionsViewModel
 
 private val permissionLabels = mapOf(
+    "android.permission.health.READ_HEALTH_DATA_HISTORY" to "Full History Access (data older than 30 days)",
     "android.permission.health.READ_STEPS" to "Steps",
     "android.permission.health.READ_HEART_RATE" to "Heart Rate",
     "android.permission.health.READ_SLEEP" to "Sleep",

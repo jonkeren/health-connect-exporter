@@ -25,7 +25,10 @@ class HealthConnectManager @Inject constructor(
         get() = HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
 
     companion object {
+        const val PERMISSION_HISTORY = "android.permission.health.READ_HEALTH_DATA_HISTORY"
+
         val PERMISSIONS: Set<String> = setOf(
+            PERMISSION_HISTORY,
             HealthPermission.getReadPermission(StepsRecord::class),
             HealthPermission.getReadPermission(HeartRateRecord::class),
             HealthPermission.getReadPermission(SleepSessionRecord::class),
