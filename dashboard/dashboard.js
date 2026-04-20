@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function setDefaultDates() {
   document.getElementById('fromDate').value = daysAgo(30);
   document.getElementById('toDate').value = today();
+  document.getElementById('singleDate').value = today();
 }
 
 function startAutoRefresh() {
@@ -66,15 +67,76 @@ function startAutoRefresh() {
 
 function onPresetChange() {
   const preset = document.getElementById('rangePreset').value;
-  const customDates = document.getElementById('customDates');
+  const customDates   = document.getElementById('customDates');
+  const singlePicker  = document.getElementById('singleDayPicker');
+
+  customDates.style.display  = 'none';
+  singlePicker.style.display = 'none';
+
   if (preset === 'custom') {
     customDates.style.display = 'flex';
+  } else if (preset === '1') {
+    singlePicker.style.display = 'flex';
+    // Sync fromDate/toDate to the single date
+    const d = document.getElementById('singleDate').value || today();
+    document.getElementById('singleDate').value = d;
+    document.getElementById('fromDate').value = d;
+    document.getElementById('toDate').value = d;
+    loadData();
   } else {
-    customDates.style.display = 'none';
     document.getElementById('fromDate').value = daysAgo(parseInt(preset, 10));
     document.getElementById('toDate').value = today();
     loadData();
   }
+}
+
+function onSingleDateChange() {
+  const d = document.getElementById('singleDate').value;
+  document.getElementById('fromDate').value = d;
+  document.getElementById('toDate').value = d;
+  loadData();
+}
+
+// Shift the current range backward (-1) or forward (+1) by the range size
+function shiftRange(dir) {
+  const preset = document.getElementById('rangePreset').value;
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  if (!from || !to) return;
+
+  const fromD = new Date(from);
+  const toD   = new Date(to);
+  // Span in days (inclusive)
+  const span = Math.round((toD - fromD) / 86400000) + 1;
+
+  const newFrom = new Date(fromD);
+  const newTo   = new Date(toD);
+  newFrom.setDate(newFrom.getDate() + dir * span);
+  newTo.setDate(newTo.getDate() + dir * span);
+
+  // Don't go past today
+  const todayD = new Date(today());
+  if (newTo > todayD) {
+    newTo.setTime(todayD.getTime());
+    newFrom.setTime(new Date(todayD));
+    newFrom.setDate(newFrom.getDate() - span + 1);
+  }
+
+  const fmt = d => d.toISOString().split('T')[0];
+  document.getElementById('fromDate').value = fmt(newFrom);
+  document.getElementById('toDate').value   = fmt(newTo);
+
+  // Keep single date picker in sync
+  if (preset === '1') {
+    document.getElementById('singleDate').value = fmt(newFrom);
+  }
+  // Switch to custom if it was a preset range (keep the visual consistent)
+  if (preset !== '1' && preset !== 'custom') {
+    document.getElementById('rangePreset').value = 'custom';
+    document.getElementById('customDates').style.display = 'flex';
+  }
+
+  loadData();
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────

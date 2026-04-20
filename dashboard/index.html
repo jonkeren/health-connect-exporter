@@ -30,8 +30,11 @@
 
   <!-- Controls -->
   <div class="controls">
+    <button class="btn btn-outline nav-btn" onclick="shiftRange(-1)" title="Previous">&#8592; Prev</button>
+
     <label for="rangePreset">Range:</label>
     <select id="rangePreset" onchange="onPresetChange()">
+      <option value="1">Single day</option>
       <option value="7">Last 7 days</option>
       <option value="14">Last 14 days</option>
       <option value="30" selected>Last 30 days</option>
@@ -39,12 +42,18 @@
       <option value="custom">Custom</option>
     </select>
 
-    <span id="customDates" style="display:none; gap:8px; align-items:center; display:none">
+    <span id="singleDayPicker" style="display:none; gap:8px; align-items:center;">
+      <input type="date" id="singleDate" onchange="onSingleDateChange()" />
+    </span>
+
+    <span id="customDates" style="display:none; gap:8px; align-items:center;">
       <label for="fromDate">From:</label>
       <input type="date" id="fromDate" />
       <label for="toDate">To:</label>
       <input type="date" id="toDate" />
     </span>
+
+    <button class="btn btn-outline nav-btn" onclick="shiftRange(1)" title="Next">Next &#8594;</button>
 
     <button class="btn btn-primary" onclick="loadData()">Refresh</button>
     <button class="btn btn-outline" onclick="exportCsv()">Export CSV</button>
