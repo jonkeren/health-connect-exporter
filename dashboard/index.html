@@ -99,8 +99,18 @@
       <canvas id="stepsChart" height="200"></canvas>
     </div>
     <div class="chart-card">
-      <h3>❤️ Heart Rate</h3>
+      <h3>❤️ Heart Rate (daily avg)</h3>
       <canvas id="heartRateChart" height="200"></canvas>
+    </div>
+    <div class="chart-card chart-card--wide">
+      <div class="chart-card-header">
+        <h3>❤️ Heart Rate per Hour</h3>
+        <div class="chart-card-controls">
+          <label for="hrDayPicker">Day:</label>
+          <select id="hrDayPicker" onchange="renderHRHourlyChart(allData)"></select>
+        </div>
+      </div>
+      <canvas id="hrHourlyChart" height="160"></canvas>
     </div>
     <div class="chart-card">
       <h3>🌙 Sleep Duration</h3>

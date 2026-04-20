@@ -217,6 +217,29 @@ function renderAll(data) {
   setText('totalDistance',validDist.length   ? sum(validDist).toFixed(1) : '—');
   setText('exportDays',   data.length);
 
+  // Populate HR day picker with days that have HR data (newest first)
+  const hrDayPicker = document.getElementById('hrDayPicker');
+  if (hrDayPicker) {
+    const prevSel = hrDayPicker.value;
+    hrDayPicker.innerHTML = '';
+    const daysWithHR = data.filter(d => (d.data?.heart_rate || []).length > 0).map(d => d.export_date).reverse();
+    if (daysWithHR.length) {
+      daysWithHR.forEach(date => {
+        const opt = document.createElement('option');
+        opt.value = date;
+        opt.textContent = date;
+        hrDayPicker.appendChild(opt);
+      });
+      hrDayPicker.value = daysWithHR.includes(prevSel) ? prevSel : daysWithHR[0];
+    } else {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No HR data';
+      hrDayPicker.appendChild(opt);
+    }
+    renderHRHourlyChart(data);
+  }
+
   // Charts
   renderBarChart('stepsChart', fmtLabels, stepsData, 'Daily Steps', COLORS.steps);
   renderLineChart('heartRateChart', fmtLabels, hrData, 'Avg Heart Rate (bpm)', COLORS.hr);
@@ -288,6 +311,108 @@ function renderLineChart(id, labels, data, label, colorSet) {
       scales: {
         y: { beginAtZero: false, grid: { color: 'rgba(128,128,128,0.1)' } },
         x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderHRHourlyChart(data) {
+  const picker = document.getElementById('hrDayPicker');
+  const selectedDate = picker ? picker.value : null;
+  if (!selectedDate || !data.length) return;
+
+  const dayData = data.find(d => d.export_date === selectedDate);
+  const samples = dayData ? (dayData.data?.heart_rate || []) : [];
+
+  // Bucket samples into hourly bins
+  const hourBuckets = {};
+  for (const s of samples) {
+    const d = new Date(s.time);
+    if (isNaN(d)) continue;
+    const h = d.getHours();
+    if (!hourBuckets[h]) hourBuckets[h] = [];
+    hourBuckets[h].push(s.bpm);
+  }
+
+  // Build 24-slot arrays
+  const hourLabels = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2,'0')}:00`);
+  const avgPerHour = hourLabels.map((_, h) => {
+    const b = hourBuckets[h];
+    if (!b || !b.length) return null;
+    return Math.round(b.reduce((s, v) => s + v, 0) / b.length);
+  });
+  const minPerHour = hourLabels.map((_, h) => {
+    const b = hourBuckets[h];
+    return b && b.length ? Math.min(...b) : null;
+  });
+  const maxPerHour = hourLabels.map((_, h) => {
+    const b = hourBuckets[h];
+    return b && b.length ? Math.max(...b) : null;
+  });
+
+  const id = 'hrHourlyChart';
+  const ctx = document.getElementById(id).getContext('2d');
+  if (charts[id]) charts[id].destroy();
+
+  charts[id] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: hourLabels,
+      datasets: [
+        {
+          label: 'Max BPM',
+          data: maxPerHour,
+          borderColor: 'rgba(239,68,68,0.3)',
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          spanGaps: true,
+          fill: false,
+        },
+        {
+          label: 'Avg BPM',
+          data: avgPerHour,
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,0.1)',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          spanGaps: true,
+          fill: '+1',
+          tension: 0.3,
+        },
+        {
+          label: 'Min BPM',
+          data: minPerHour,
+          borderColor: 'rgba(239,68,68,0.3)',
+          backgroundColor: 'rgba(239,68,68,0.05)',
+          borderWidth: 1,
+          borderDash: [4, 3],
+          pointRadius: 0,
+          spanGaps: true,
+          fill: false,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.parsed.y !== null ? `${ctx.dataset.label}: ${ctx.parsed.y} bpm` : null
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: false,
+          title: { display: true, text: 'BPM' },
+          grid: { color: 'rgba(128,128,128,0.1)' }
+        }
       }
     }
   });
