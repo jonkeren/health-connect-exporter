@@ -150,6 +150,14 @@ header .last-refresh {
   gap: 6px;
 }
 .chart-card canvas { width: 100% !important; }
+.chart-card--wide { grid-column: 1 / -1; }
+
+/* Sleep stage badges in table */
+.sleep-stage { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; font-weight: 500; }
+.sleep-stage.deep  { background: rgba(67,56,202,0.15); color: #4338ca; }
+.sleep-stage.rem   { background: rgba(124,58,237,0.15); color: #7c3aed; }
+.sleep-stage.light { background: rgba(59,130,246,0.15); color: #2563eb; }
+.sleep-stage.awake { background: rgba(251,191,36,0.2);  color: #92400e; }
 
 /* Data table */
 .table-card {

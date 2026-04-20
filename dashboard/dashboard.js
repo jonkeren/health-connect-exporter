@@ -22,6 +22,15 @@ const COLORS = {
   spo2:     { bg: 'rgba(6,182,212,0.2)',     border: '#06b6d4' },
 };
 
+const SLEEP_STAGE_COLORS = {
+  DEEP:     { bg: 'rgba(67,56,202,0.85)',   border: '#4338ca' },
+  REM:      { bg: 'rgba(124,58,237,0.85)',  border: '#7c3aed' },
+  LIGHT:    { bg: 'rgba(147,197,253,0.85)', border: '#93c5fd' },
+  AWAKE:    { bg: 'rgba(251,191,36,0.85)',  border: '#fbbf24' },
+  SLEEPING: { bg: 'rgba(99,102,241,0.5)',   border: '#6366f1' },
+  UNKNOWN:  { bg: 'rgba(156,163,175,0.5)',  border: '#9ca3af' },
+};
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 function today() {
   return new Date().toISOString().split('T')[0];
@@ -112,6 +121,50 @@ function totalSleepHours(dayData) {
   return ms / 3600000;
 }
 
+// Returns the earliest start time across all sleep entries for a day
+function sleepBedtime(dayData) {
+  const sessions = dayData.data?.sleep || [];
+  if (!sessions.length) return null;
+  const times = sessions.map(s => new Date(s.start)).filter(d => !isNaN(d));
+  if (!times.length) return null;
+  return new Date(Math.min(...times));
+}
+
+// Returns the latest end time across all sleep entries for a day
+function sleepWakeTime(dayData) {
+  const sessions = dayData.data?.sleep || [];
+  if (!sessions.length) return null;
+  const times = sessions.map(s => new Date(s.end)).filter(d => !isNaN(d));
+  if (!times.length) return null;
+  return new Date(Math.max(...times));
+}
+
+// Returns hours per named stage: { DEEP, REM, LIGHT, AWAKE, SLEEPING, UNKNOWN }
+function sleepStageHours(dayData) {
+  const sessions = dayData.data?.sleep || [];
+  const out = { DEEP: 0, REM: 0, LIGHT: 0, AWAKE: 0, SLEEPING: 0, UNKNOWN: 0 };
+  for (const s of sessions) {
+    if (s.start && s.end) {
+      const h = (new Date(s.end) - new Date(s.start)) / 3600000;
+      const key = s.stage && out.hasOwnProperty(s.stage) ? s.stage : 'UNKNOWN';
+      out[key] += h;
+    }
+  }
+  return out;
+}
+
+function fmtTime(date) {
+  if (!date) return '—';
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function fmtHm(hours) {
+  if (!hours || hours <= 0) return '—';
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
 function latestWeight(dayData) {
   const records = dayData.data?.weight || [];
   if (!records.length) return null;
@@ -168,6 +221,8 @@ function renderAll(data) {
   renderBarChart('stepsChart', fmtLabels, stepsData, 'Daily Steps', COLORS.steps);
   renderLineChart('heartRateChart', fmtLabels, hrData, 'Avg Heart Rate (bpm)', COLORS.hr);
   renderBarChart('sleepChart', fmtLabels, sleepData, 'Sleep Duration (h)', COLORS.sleep);
+  renderSleepStagesChart('sleepStagesChart', fmtLabels, data);
+  renderSleepTable(data, labels);
   renderLineChart('weightChart', fmtLabels, weightData, 'Weight (kg)', COLORS.weight);
   renderBarChart('caloriesChart', fmtLabels, calData, 'Calories (kcal)', COLORS.calories);
   renderLineChart('spo2Chart', fmtLabels, spo2Data, 'SpO2 (%)', COLORS.spo2);
@@ -236,6 +291,80 @@ function renderLineChart(id, labels, data, label, colorSet) {
       }
     }
   });
+}
+
+function renderSleepStagesChart(id, labels, data) {
+  const ctx = document.getElementById(id).getContext('2d');
+  if (charts[id]) charts[id].destroy();
+
+  const stages = ['DEEP', 'REM', 'LIGHT', 'AWAKE', 'SLEEPING', 'UNKNOWN'];
+  const stageLabels = { DEEP: 'Deep', REM: 'REM', LIGHT: 'Light', AWAKE: 'Awake', SLEEPING: 'Sleeping (unspecified)', UNKNOWN: 'Unknown' };
+
+  const datasets = stages.map(stage => ({
+    label: stageLabels[stage],
+    data: data.map(d => parseFloat(sleepStageHours(d)[stage].toFixed(2))),
+    backgroundColor: SLEEP_STAGE_COLORS[stage].bg,
+    borderColor: SLEEP_STAGE_COLORS[stage].border,
+    borderWidth: 1,
+    borderRadius: 2,
+  })).filter(ds => ds.data.some(v => v > 0));
+
+  charts[id] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: true, position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const h = ctx.parsed.y;
+              if (!h) return null;
+              return `${ctx.dataset.label}: ${fmtHm(h)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Hours' }, grid: { color: 'rgba(128,128,128,0.1)' } }
+      }
+    }
+  });
+}
+
+function renderSleepTable(data, labels) {
+  const tbody = document.getElementById('sleepTableBody');
+  if (!tbody) return;
+
+  const rows = data.map((d, i) => {
+    const bedtime  = sleepBedtime(d);
+    const waketime = sleepWakeTime(d);
+    const stages   = sleepStageHours(d);
+    const total    = totalSleepHours(d);
+    if (total <= 0) return null;
+
+    const stageCell = stage => {
+      const h = stages[stage];
+      return h > 0 ? fmtHm(h) : '<span style="color:var(--text-muted)">—</span>';
+    };
+
+    return `<tr>
+      <td><strong>${labels[i]}</strong></td>
+      <td>${fmtTime(bedtime)}</td>
+      <td>${fmtTime(waketime)}</td>
+      <td>${fmtHm(total)}</td>
+      <td><span class="sleep-stage deep">${stageCell('DEEP')}</span></td>
+      <td><span class="sleep-stage rem">${stageCell('REM')}</span></td>
+      <td><span class="sleep-stage light">${stageCell('LIGHT')}</span></td>
+      <td><span class="sleep-stage awake">${stageCell('AWAKE')}</span></td>
+    </tr>`;
+  }).filter(Boolean).reverse();
+
+  tbody.innerHTML = rows.length
+    ? rows.join('')
+    : '<tr><td colspan="8" class="no-data">No sleep data in selected range.</td></tr>';
 }
 
 function renderTable(data, labels) {

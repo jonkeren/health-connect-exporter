@@ -106,6 +106,10 @@
       <h3>🌙 Sleep Duration</h3>
       <canvas id="sleepChart" height="200"></canvas>
     </div>
+    <div class="chart-card chart-card--wide">
+      <h3>🌙 Sleep Stages</h3>
+      <canvas id="sleepStagesChart" height="200"></canvas>
+    </div>
     <div class="chart-card">
       <h3>⚖️ Weight</h3>
       <canvas id="weightChart" height="200"></canvas>
@@ -117,6 +121,30 @@
     <div class="chart-card">
       <h3>💧 SpO2</h3>
       <canvas id="spo2Chart" height="200"></canvas>
+    </div>
+  </div>
+
+  <!-- Sleep Detail Table -->
+  <div class="table-card">
+    <h3>🌙 Sleep Detail</h3>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Bedtime</th>
+            <th>Wake up</th>
+            <th>Total</th>
+            <th>Deep</th>
+            <th>REM</th>
+            <th>Light</th>
+            <th>Awake</th>
+          </tr>
+        </thead>
+        <tbody id="sleepTableBody">
+          <tr><td colspan="8" class="no-data">Loading data...</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
