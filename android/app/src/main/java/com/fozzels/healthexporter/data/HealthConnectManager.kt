@@ -206,6 +206,9 @@ class HealthConnectManager @Inject constructor(
                     }
                 }
             }
+            // Health Connect may return duplicate records when multiple apps (e.g. Samsung Health +
+            // Google Fit) contribute the same sleep session. Deduplicate by (start, end, stage).
+            .distinctBy { Triple(it.start, it.end, it.stage) }
     } catch (e: Exception) { emptyList() }
 
     private suspend fun readBloodPressure(timeRange: TimeRangeFilter): List<BloodPressureEntry> = try {
