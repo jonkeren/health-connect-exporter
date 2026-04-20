@@ -140,6 +140,10 @@ function shiftRange(dir) {
 }
 
 // ── Data loading ──────────────────────────────────────────────────────────────
+function isDayView() {
+  return document.getElementById('rangePreset').value === '1';
+}
+
 async function loadData() {
   const from = document.getElementById('fromDate').value;
   const to = document.getElementById('toDate').value;
@@ -273,14 +277,36 @@ function renderAll(data) {
   const validSpo2    = spo2Data.filter(v => v > 0);
   const validDist    = data.map(totalDistanceKm).filter(v => v > 0);
 
+  const dayView = isDayView();
+
+  // Summary card labels adapt to day view
+  setText('avgStepsLabel',    dayView ? 'Steps' : 'Avg Daily Steps');
+  setText('avgHRLabel',       dayView ? 'Heart Rate' : 'Avg Heart Rate');
+  setText('totalSleepLabel',  dayView ? 'Sleep' : 'Total Sleep');
+  setText('avgCaloriesLabel', dayView ? 'Calories' : 'Avg Calories');
+  setText('exportDaysLabel',  dayView ? 'Date' : 'Export Days');
+
   setText('avgSteps',     validSteps.length  ? Math.round(avg(validSteps)).toLocaleString() : '—');
   setText('avgHR',        validHR.length     ? Math.round(avg(validHR)) : '—');
-  setText('totalSleep',   validSleep.length  ? sum(validSleep).toFixed(1) : '—');
+  setText('totalSleep',   validSleep.length  ? (dayView ? fmtHm(sum(validSleep)) : sum(validSleep).toFixed(1)) : '—');
   setText('avgWeight',    validWeight.length ? avg(validWeight).toFixed(1) : '—');
-  setText('avgCalories',  validCal.length    ? Math.round(avg(validCal)).toLocaleString() : '—');
+  setText('avgCalories',  validCal.length    ? Math.round(dayView ? sum(validCal) : avg(validCal)).toLocaleString() : '—');
   setText('avgSpO2',      validSpo2.length   ? avg(validSpo2).toFixed(1) : '—');
   setText('totalDistance',validDist.length   ? sum(validDist).toFixed(1) : '—');
-  setText('exportDays',   data.length);
+  setText('exportDays',   dayView ? (data[0]?.export_date || '—') : data.length);
+
+  // Show/hide trend charts — hidden in day view
+  const trendIds = ['stepsChart', 'heartRateChart', 'sleepChart', 'weightChart', 'caloriesChart', 'spo2Chart'];
+  trendIds.forEach(id => {
+    const card = document.getElementById(id)?.closest('.chart-card');
+    if (card) card.style.display = dayView ? 'none' : '';
+  });
+  // Sleep stages chart: show in both views; HR hourly: always show
+  const sleepStagesCard = document.getElementById('sleepStagesChart')?.closest('.chart-card');
+  if (sleepStagesCard) sleepStagesCard.style.display = '';
+  // Daily data table: hide in day view (sleep detail + activities are enough)
+  const dataTableCard = document.getElementById('dataTableBody')?.closest('.table-card');
+  if (dataTableCard) dataTableCard.style.display = dayView ? 'none' : '';
 
   // Populate HR day picker with days that have HR data (newest first)
   const hrDayPicker = document.getElementById('hrDayPicker');
@@ -305,15 +331,17 @@ function renderAll(data) {
     renderHRHourlyChart(data);
   }
 
-  // Charts
-  renderBarChart('stepsChart', fmtLabels, stepsData, 'Daily Steps', COLORS.steps);
-  renderLineChart('heartRateChart', fmtLabels, hrData, 'Avg Heart Rate (bpm)', COLORS.hr);
-  renderBarChart('sleepChart', fmtLabels, sleepData, 'Sleep Duration (h)', COLORS.sleep);
+  // Charts — trend charts only rendered when not in day view
+  if (!dayView) {
+    renderBarChart('stepsChart', fmtLabels, stepsData, 'Daily Steps', COLORS.steps);
+    renderLineChart('heartRateChart', fmtLabels, hrData, 'Avg Heart Rate (bpm)', COLORS.hr);
+    renderBarChart('sleepChart', fmtLabels, sleepData, 'Sleep Duration (h)', COLORS.sleep);
+    renderLineChart('weightChart', fmtLabels, weightData, 'Weight (kg)', COLORS.weight);
+    renderBarChart('caloriesChart', fmtLabels, calData, 'Calories (kcal)', COLORS.calories);
+    renderLineChart('spo2Chart', fmtLabels, spo2Data, 'SpO2 (%)', COLORS.spo2);
+  }
   renderSleepStagesChart('sleepStagesChart', fmtLabels, data);
   renderSleepTable(data, labels);
-  renderLineChart('weightChart', fmtLabels, weightData, 'Weight (kg)', COLORS.weight);
-  renderBarChart('caloriesChart', fmtLabels, calData, 'Calories (kcal)', COLORS.calories);
-  renderLineChart('spo2Chart', fmtLabels, spo2Data, 'SpO2 (%)', COLORS.spo2);
 
   // Table
   renderTable(data, labels);
