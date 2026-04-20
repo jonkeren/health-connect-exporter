@@ -65,6 +65,12 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- WorkManager foreground service — must declare foregroundServiceType for Android 14+ -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
         <!-- Disable default WorkManager initializer (we use Hilt) -->
         <provider
             android:name="androidx.startup.InitializationProvider"
