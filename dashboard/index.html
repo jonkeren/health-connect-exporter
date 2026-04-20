@@ -172,8 +172,10 @@
   <!-- Activities -->
   <div class="table-card">
     <div class="chart-card-header">
-      <h3>🏃 Activities</h3>
+      <h3>🏃 Activities <span id="activityCount" style="font-size:0.8rem; font-weight:400; color:var(--text-muted); margin-left:8px;"></span></h3>
       <div class="chart-card-controls">
+        <select id="activityYearFilter" onchange="filterActivities()"></select>
+        <select id="activityMonthFilter" onchange="filterActivities()"></select>
         <select id="activityTypeFilter" onchange="filterActivities()">
           <option value="">All types</option>
           <option value="walking">Walking</option>

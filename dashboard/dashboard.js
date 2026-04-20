@@ -628,13 +628,56 @@ async function loadActivities() {
     const res = await fetch(`${API_BASE}/api/activities`);
     if (!res.ok) return;
     allActivities = await res.json();
+    populateActivityFilters();
     filterActivities();
   } catch(e) { console.warn('Activities not available:', e); }
 }
 
+function populateActivityFilters() {
+  // Collect unique years and months from all activities
+  const years  = [...new Set(allActivities.map(a => a.startTime.slice(0, 4)))].sort().reverse();
+  const months = [
+    ['01','January'],['02','February'],['03','March'],['04','April'],
+    ['05','May'],['06','June'],['07','July'],['08','August'],
+    ['09','September'],['10','October'],['11','November'],['12','December']
+  ];
+
+  const yearSel = document.getElementById('activityYearFilter');
+  const prevYear = yearSel.value;
+  yearSel.innerHTML = '<option value="">All years</option>';
+  years.forEach(y => {
+    const opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    yearSel.appendChild(opt);
+  });
+  if (years.includes(prevYear)) yearSel.value = prevYear;
+  else if (years.length) yearSel.value = years[0]; // default to most recent year
+
+  const monthSel = document.getElementById('activityMonthFilter');
+  const prevMonth = monthSel.value;
+  monthSel.innerHTML = '<option value="">All months</option>';
+  months.forEach(([val, label]) => {
+    const opt = document.createElement('option');
+    opt.value = val; opt.textContent = label;
+    monthSel.appendChild(opt);
+  });
+  if (prevMonth) monthSel.value = prevMonth;
+}
+
 function filterActivities() {
-  const type = document.getElementById('activityTypeFilter')?.value || '';
-  const filtered = type ? allActivities.filter(a => a.type === type) : allActivities;
+  const type  = document.getElementById('activityTypeFilter')?.value  || '';
+  const year  = document.getElementById('activityYearFilter')?.value  || '';
+  const month = document.getElementById('activityMonthFilter')?.value || '';
+
+  let filtered = allActivities;
+  if (type)  filtered = filtered.filter(a => a.type === type);
+  if (year)  filtered = filtered.filter(a => a.startTime.slice(0, 4) === year);
+  if (month) filtered = filtered.filter(a => a.startTime.slice(5, 7) === month);
+
+  // Update count badge
+  const badge = document.getElementById('activityCount');
+  if (badge) badge.textContent = `${filtered.length} activities`;
+
   renderActivitiesTable(filtered);
 }
 
