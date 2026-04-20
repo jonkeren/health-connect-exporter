@@ -8,6 +8,8 @@
   <!-- Chart.js from CDN — no build step needed -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/date-fns@3.6.0/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -155,6 +157,44 @@
           <tr><td colspan="8" class="no-data">Loading data...</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Activities -->
+  <div class="table-card">
+    <div class="chart-card-header">
+      <h3>🏃 Activities</h3>
+      <div class="chart-card-controls">
+        <select id="activityTypeFilter" onchange="filterActivities()">
+          <option value="">All types</option>
+          <option value="walking">Walking</option>
+          <option value="biking">Biking</option>
+          <option value="running">Running</option>
+          <option value="training">Training</option>
+        </select>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr>
+          <th>Date</th><th>Type</th><th>Duration</th><th>Distance</th><th>Calories</th><th>Avg Speed</th><th>Map</th>
+        </tr></thead>
+        <tbody id="activitiesTableBody">
+          <tr><td colspan="7" class="no-data">Loading activities...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Map modal -->
+  <div id="mapModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:var(--card-bg); border-radius:12px; width:90vw; max-width:900px; height:80vh; display:flex; flex-direction:column; overflow:hidden;">
+      <div style="padding:16px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border);">
+        <div id="mapModalTitle" style="font-weight:600;"></div>
+        <button onclick="closeMap()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text);">&#x2715;</button>
+      </div>
+      <div id="activityMap" style="flex:1;"></div>
+      <div id="mapStats" style="padding:12px 20px; display:flex; gap:24px; border-top:1px solid var(--border); font-size:0.85rem; color:var(--text-muted);"></div>
     </div>
   </div>
 

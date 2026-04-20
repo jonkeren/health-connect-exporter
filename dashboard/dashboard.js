@@ -97,6 +97,9 @@ async function loadData() {
   } finally {
     setLoading(false);
   }
+
+  // Load activities independently (separate data source)
+  loadActivities();
 }
 
 // ── Aggregation helpers ───────────────────────────────────────────────────────
@@ -524,6 +527,105 @@ function renderTable(data, labels) {
   }).reverse(); // newest first
 
   tbody.innerHTML = rows.join('');
+}
+
+// ── Activities ────────────────────────────────────────────────
+let allActivities = [];
+let activityMap = null;
+
+async function loadActivities() {
+  try {
+    const res = await fetch(`${API_BASE}/api/activities`);
+    if (!res.ok) return;
+    allActivities = await res.json();
+    filterActivities();
+  } catch(e) { console.warn('Activities not available:', e); }
+}
+
+function filterActivities() {
+  const type = document.getElementById('activityTypeFilter')?.value || '';
+  const filtered = type ? allActivities.filter(a => a.type === type) : allActivities;
+  renderActivitiesTable(filtered);
+}
+
+function renderActivitiesTable(activities) {
+  const tbody = document.getElementById('activitiesTableBody');
+  if (!tbody) return;
+  if (!activities.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="no-data">No activities found.</td></tr>';
+    return;
+  }
+  const typeEmoji = { walking: '🚶', biking: '🚴', running: '🏃', training: '🏋️', other: '⚡' };
+  tbody.innerHTML = activities.map(a => {
+    const date = a.startTime.slice(0, 10);
+    const dur = formatDuration(a.durationSeconds);
+    const dist = a.distanceMeters > 0 ? (a.distanceMeters / 1000).toFixed(2) + ' km' : '—';
+    const cal = a.calories > 0 ? Math.round(a.calories) + ' kcal' : '—';
+    const spd = a.avgSpeedMs > 0 ? (a.avgSpeedMs * 3.6).toFixed(1) + ' km/h' : '—';
+    const emoji = typeEmoji[a.type] || '⚡';
+    const mapBtn = a.hasGps
+      ? `<button class="btn btn-outline" style="padding:4px 10px;font-size:0.8rem;" onclick="openMap('${a.id}')">&#x1F5FA;&#xFE0F; Map</button>`
+      : '<span style="color:var(--text-muted)">—</span>';
+    return `<tr>
+      <td>${date}</td>
+      <td>${emoji} ${a.type.charAt(0).toUpperCase() + a.type.slice(1)}</td>
+      <td>${dur}</td><td>${dist}</td><td>${cal}</td><td>${spd}</td><td>${mapBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return '—';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+async function openMap(id) {
+  const modal = document.getElementById('mapModal');
+  modal.style.display = 'flex';
+  document.getElementById('mapModalTitle').textContent = 'Loading...';
+  document.getElementById('mapStats').innerHTML = '';
+  try {
+    const res = await fetch(`${API_BASE}/api/activities/${encodeURIComponent(id)}`);
+    const activity = await res.json();
+    const typeEmoji = { walking: '🚶', biking: '🚴', running: '🏃', training: '🏋️' };
+    const emoji = typeEmoji[activity.type] || '⚡';
+    const date = activity.startTime.slice(0, 10);
+    document.getElementById('mapModalTitle').textContent =
+      `${emoji} ${activity.type.charAt(0).toUpperCase() + activity.type.slice(1)} — ${date}`;
+    const dur = formatDuration(activity.durationSeconds);
+    const dist = activity.distanceMeters > 0 ? (activity.distanceMeters / 1000).toFixed(2) + ' km' : null;
+    const cal = activity.calories > 0 ? Math.round(activity.calories) + ' kcal' : null;
+    const spd = activity.avgSpeedMs > 0 ? (activity.avgSpeedMs * 3.6).toFixed(1) + ' km/h avg' : null;
+    document.getElementById('mapStats').innerHTML =
+      [dur, dist, cal, spd].filter(Boolean).map(s => `<span>${s}</span>`).join('');
+    if (activityMap) { activityMap.remove(); activityMap = null; }
+    activityMap = L.map('activityMap');
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+    }).addTo(activityMap);
+    if (activity.trackpoints && activity.trackpoints.length > 1) {
+      const coords = activity.trackpoints.map(p => [p.lat, p.lng]);
+      const line = L.polyline(coords, { color: '#ef4444', weight: 3, opacity: 0.8 }).addTo(activityMap);
+      L.circleMarker(coords[0], { radius: 8, color: '#22c55e', fillColor: '#22c55e', fillOpacity: 1 }).bindPopup('Start').addTo(activityMap);
+      L.circleMarker(coords[coords.length-1], { radius: 8, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 1 }).bindPopup('Finish').addTo(activityMap);
+      activityMap.fitBounds(line.getBounds(), { padding: [20, 20] });
+    } else {
+      document.getElementById('mapModalTitle').textContent += ' (no GPS data)';
+      activityMap.setView([52.3, 5.3], 7);
+    }
+  } catch(e) {
+    document.getElementById('mapModalTitle').textContent = 'Failed to load activity';
+  }
+}
+
+function closeMap() {
+  document.getElementById('mapModal').style.display = 'none';
+  if (activityMap) { activityMap.remove(); activityMap = null; }
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
