@@ -16,6 +16,7 @@ import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import org.json.JSONObject
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -78,9 +79,9 @@ class ExportRepository @Inject constructor(
     }
 
     /**
-     * Check if a day has already been exported to the HTTP server.
-     * Sends a HEAD request to /api/data/{date} — returns true if the server responds 200.
-     * Returns false for Drive target (DriveExportService handles deduplication internally).
+     * Check if a day has already been exported to the HTTP server WITH actual data.
+     * Fetches GET /api/data/{date} and checks whether any data arrays are non-empty.
+     * Returns false if the file is missing, unreachable, or contains only empty arrays.
      */
     suspend fun checkExistingExport(date: String, httpUrl: String, httpToken: String): Boolean {
         if (httpUrl.isBlank()) return false
@@ -91,14 +92,30 @@ class ExportRepository @Inject constructor(
                     .encodedPath("/api/data/$date")
                     .build()
                     .toString()
-                val requestBuilder = Request.Builder().url(checkUrl).head()
+                val requestBuilder = Request.Builder().url(checkUrl).get()
                 if (httpToken.isNotBlank()) {
                     requestBuilder.header("Authorization", "Bearer $httpToken")
                 }
                 val response = okHttpClient.newCall(requestBuilder.build()).execute()
-                val exists = response.code == 200
+                if (response.code != 200) {
+                    response.close()
+                    return@withContext false
+                }
+                val body = response.body?.string() ?: ""
                 response.close()
-                exists
+                // Only treat as "already synced" if the file has at least one non-empty data array
+                try {
+                    val json = JSONObject(body)
+                    val data = json.optJSONObject("data") ?: return@withContext false
+                    val keys = data.keys()
+                    while (keys.hasNext()) {
+                        val arr = data.optJSONArray(keys.next())
+                        if (arr != null && arr.length() > 0) return@withContext true
+                    }
+                    false // all arrays empty
+                } catch (e: Exception) {
+                    false
+                }
             } catch (e: Exception) {
                 false
             }

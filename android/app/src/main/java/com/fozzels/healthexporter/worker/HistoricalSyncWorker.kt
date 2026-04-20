@@ -142,6 +142,15 @@ class HistoricalSyncWorker @AssistedInject constructor(
                         data = healthData
                     )
 
+                    // Skip days with no data at all — don't upload empty shells
+                    val totalRecordsToday = healthData.recordCounts().values.sum()
+                    if (totalRecordsToday == 0) {
+                        daysProcessed++
+                        currentDate = currentDate.plusDays(1)
+                        delay(100L)
+                        continue
+                    }
+
                     val uploadResult: kotlin.Result<Unit> = when (settings.exportTarget) {
                         ExportTarget.HTTP -> {
                             if (settings.httpUrl.isBlank())
