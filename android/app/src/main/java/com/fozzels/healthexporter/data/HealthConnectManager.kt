@@ -313,7 +313,7 @@ class HealthConnectManager @Inject constructor(
                 val durationSeconds = (r.endTime.epochSecond - r.startTime.epochSecond).toDouble()
 
                 // Extract GPS route if available
-                val routePoints = r.exerciseRoute?.exerciseLocations?.map { loc ->
+                val routePoints = r.route?.exerciseLocations?.map { loc ->
                     RoutePoint(
                         lat = loc.latitude,
                         lng = loc.longitude,
@@ -321,7 +321,7 @@ class HealthConnectManager @Inject constructor(
                         time = loc.time.toString()
                     )
                 }
-                val hasGps = !routePoints.isNullOrEmpty()
+                val hasGps = routePoints != null && routePoints.isNotEmpty()
 
                 // Calculate total distance from route points if available
                 val distanceFromRoute: Double? = if (hasGps && routePoints != null && routePoints.size >= 2) {
