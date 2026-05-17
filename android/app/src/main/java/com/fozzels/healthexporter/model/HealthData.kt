@@ -145,6 +145,7 @@ data class RoutePoint(
     val time: String
 )
 
+@Serializable
 data class ExerciseSessionEntry(
     val start: String,
     val end: String,
