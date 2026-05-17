@@ -138,7 +138,6 @@ data class NutritionEntry(
 )
 
 @Serializable
-@Serializable
 data class RoutePoint(
     val lat: Double,
     val lng: Double,

@@ -315,7 +315,7 @@ class HealthConnectManager @Inject constructor(
                 // Extract GPS route if available (Health Connect 1.1.0+)
                 val routeData = r.exerciseRouteResult
                 val routePoints: List<RoutePoint>? = when (routeData) {
-                    is ExerciseRouteResult.Data -> routeData.exerciseRoute.exerciseLocations.map { loc ->
+                    is ExerciseRouteResult.Data -> routeData.exerciseRoute.route.map { loc ->
                         RoutePoint(
                             lat = loc.latitude,
                             lng = loc.longitude,
