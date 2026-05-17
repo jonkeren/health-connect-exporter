@@ -12,6 +12,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.Instant
+import kotlin.math.pow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -308,11 +309,49 @@ class HealthConnectManager @Inject constructor(
     private suspend fun readExerciseSessions(timeRange: TimeRangeFilter): List<ExerciseSessionEntry> = try {
         healthConnectClient.readRecords(ReadRecordsRequest(ExerciseSessionRecord::class, timeRange))
             .records.map { r ->
+                // Calculate duration in seconds
+                val durationSeconds = (r.endTime.epochSecond - r.startTime.epochSecond).toDouble()
+
+                // Extract GPS route if available
+                val routePoints = r.exerciseRoute?.exerciseLocations?.map { loc ->
+                    RoutePoint(
+                        lat = loc.latitude,
+                        lng = loc.longitude,
+                        alt = loc.altitude?.inMeters,
+                        time = loc.time.toString()
+                    )
+                }
+                val hasGps = !routePoints.isNullOrEmpty()
+
+                // Calculate total distance from route points if available
+                val distanceFromRoute: Double? = if (hasGps && routePoints != null && routePoints.size >= 2) {
+                    var total = 0.0
+                    for (i in 1 until routePoints.size) {
+                        val prev = routePoints[i - 1]
+                        val curr = routePoints[i]
+                        val dLat = Math.toRadians(curr.lat - prev.lat)
+                        val dLng = Math.toRadians(curr.lng - prev.lng)
+                        val a = Math.sin(dLat / 2).pow(2) +
+                                Math.cos(Math.toRadians(prev.lat)) * Math.cos(Math.toRadians(curr.lat)) *
+                                Math.sin(dLng / 2).pow(2)
+                        total += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                    }
+                    total
+                } else null
+
+                // Average speed
+                val avgSpeed = if (distanceFromRoute != null && durationSeconds > 0)
+                    distanceFromRoute / durationSeconds else null
+
                 ExerciseSessionEntry(
                     start = r.startTime.toString(),
                     end = r.endTime.toString(),
                     type = exerciseTypeToString(r.exerciseType),
-                    title = r.title
+                    title = r.title,
+                    hasGps = hasGps,
+                    route = routePoints,
+                    distanceMeters = distanceFromRoute,
+                    avgSpeedMs = avgSpeed
                 )
             }
     } catch (e: Exception) { emptyList() }

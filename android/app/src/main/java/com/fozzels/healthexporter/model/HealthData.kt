@@ -138,10 +138,22 @@ data class NutritionEntry(
 )
 
 @Serializable
+data class RoutePoint(
+    val lat: Double,
+    val lng: Double,
+    val alt: Double? = null,
+    val time: String
+)
+
 data class ExerciseSessionEntry(
     val start: String,
     val end: String,
     val type: String,
     val calories: Double? = null,
-    val title: String? = null
+    val title: String? = null,
+    val distanceMeters: Double? = null,
+    val steps: Int? = null,
+    val avgSpeedMs: Double? = null,
+    val hasGps: Boolean = false,
+    val route: List<RoutePoint>? = null
 )
