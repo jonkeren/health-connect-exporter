@@ -5,6 +5,7 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
+import androidx.health.connect.client.records.ExerciseRouteResult
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import com.fozzels.healthexporter.model.*
@@ -311,11 +312,49 @@ class HealthConnectManager @Inject constructor(
                 // Calculate duration in seconds
                 val durationSeconds = (r.endTime.epochSecond - r.startTime.epochSecond).toDouble()
 
+                // Extract GPS route if available (Health Connect 1.1.0+)
+                val routeData = r.exerciseRouteResult
+                val routePoints: List<RoutePoint>? = when (routeData) {
+                    is ExerciseRouteResult.Data -> routeData.exerciseRoute.exerciseLocations.map { loc ->
+                        RoutePoint(
+                            lat = loc.latitude,
+                            lng = loc.longitude,
+                            alt = loc.altitude?.inMeters,
+                            time = loc.time.toString()
+                        )
+                    }
+                    else -> null
+                }
+                val hasGps = !routePoints.isNullOrEmpty()
+
+                // Calculate distance from GPS points (Haversine)
+                val distanceFromRoute: Double? = if (hasGps && routePoints != null && routePoints.size >= 2) {
+                    var total = 0.0
+                    for (i in 1 until routePoints.size) {
+                        val prev = routePoints[i - 1]
+                        val curr = routePoints[i]
+                        val dLat = Math.toRadians(curr.lat - prev.lat)
+                        val dLng = Math.toRadians(curr.lng - prev.lng)
+                        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                Math.cos(Math.toRadians(prev.lat)) * Math.cos(Math.toRadians(curr.lat)) *
+                                Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                        total += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                    }
+                    total
+                } else null
+
+                val avgSpeed = if (distanceFromRoute != null && durationSeconds > 0)
+                    distanceFromRoute / durationSeconds else null
+
                 ExerciseSessionEntry(
                     start = r.startTime.toString(),
                     end = r.endTime.toString(),
                     type = exerciseTypeToString(r.exerciseType),
-                    title = r.title
+                    title = r.title,
+                    hasGps = hasGps,
+                    route = routePoints,
+                    distanceMeters = distanceFromRoute,
+                    avgSpeedMs = avgSpeed
                 )
             }
     } catch (e: Exception) { emptyList() }
