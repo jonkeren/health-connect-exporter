@@ -27,6 +27,7 @@ class HealthConnectManager @Inject constructor(
 
     companion object {
         const val PERMISSION_HISTORY = "android.permission.health.READ_HEALTH_DATA_HISTORY"
+        const val PERMISSION_EXERCISE_ROUTES = "android.permission.health.READ_EXERCISE_ROUTES"
 
         val PERMISSIONS: Set<String> = setOf(
             PERMISSION_HISTORY,
@@ -44,6 +45,7 @@ class HealthConnectManager @Inject constructor(
             HealthPermission.getReadPermission(HydrationRecord::class),
             HealthPermission.getReadPermission(NutritionRecord::class),
             HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+            PERMISSION_EXERCISE_ROUTES,
         )
 
         fun sleepStageToString(stage: Int): String = when (stage) {
