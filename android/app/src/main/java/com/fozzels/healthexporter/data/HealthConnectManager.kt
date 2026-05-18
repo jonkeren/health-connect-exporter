@@ -313,18 +313,22 @@ class HealthConnectManager @Inject constructor(
                 val durationSeconds = (r.endTime.epochSecond - r.startTime.epochSecond).toDouble()
 
                 // Extract GPS route if available (Health Connect 1.1.0+)
-                val routeData = r.exerciseRouteResult
-                val routePoints: List<RoutePoint>? = when (routeData) {
-                    is ExerciseRouteResult.Data -> routeData.exerciseRoute.route.map { loc ->
-                        RoutePoint(
-                            lat = loc.latitude,
-                            lng = loc.longitude,
-                            alt = loc.altitude?.inMeters,
-                            time = loc.time.toString()
-                        )
+                // Wrapped in try-catch: READ_EXERCISE_ROUTES permission may not be granted,
+                // which would otherwise crash the entire exercise_sessions read.
+                val routePoints: List<RoutePoint>? = try {
+                    val routeData = r.exerciseRouteResult
+                    when (routeData) {
+                        is ExerciseRouteResult.Data -> routeData.exerciseRoute.route.map { loc ->
+                            RoutePoint(
+                                lat = loc.latitude,
+                                lng = loc.longitude,
+                                alt = loc.altitude?.inMeters,
+                                time = loc.time.toString()
+                            )
+                        }
+                        else -> null
                     }
-                    else -> null
-                }
+                } catch (e: Exception) { null }
                 val hasGps = !routePoints.isNullOrEmpty()
 
                 // Calculate distance from GPS points (Haversine)
