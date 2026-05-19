@@ -129,13 +129,21 @@ class HealthConnectManager @Inject constructor(
         return granted.containsAll(PERMISSIONS)
     }
 
-    suspend fun readHealthData(startTime: Instant, endTime: Instant): HealthDataPayload =
+    suspend fun readHealthData(
+        startTime: Instant,
+        endTime: Instant,
+        sleepStartTime: Instant = startTime,
+        sleepEndTime: Instant = endTime
+    ): HealthDataPayload =
         withContext(Dispatchers.IO) {
             val timeRange = TimeRangeFilter.between(startTime, endTime)
+            // Sleep uses a separate noon-to-noon window (Samsung Health style)
+            // so overnight sleep is attributed to the day you wake up.
+            val sleepTimeRange = TimeRangeFilter.between(sleepStartTime, sleepEndTime)
             HealthDataPayload(
                 steps = readSteps(timeRange),
                 heart_rate = readHeartRate(timeRange),
-                sleep = readSleep(timeRange),
+                sleep = readSleep(sleepTimeRange),
                 blood_pressure = readBloodPressure(timeRange),
                 weight = readWeight(timeRange),
                 calories = readCalories(timeRange),
@@ -153,14 +161,18 @@ class HealthConnectManager @Inject constructor(
     suspend fun readHealthDataForTypes(
         startTime: Instant,
         endTime: Instant,
-        selectedTypeKeys: Set<String>
+        selectedTypeKeys: Set<String>,
+        sleepStartTime: Instant = startTime,
+        sleepEndTime: Instant = endTime
     ): HealthDataPayload = withContext(Dispatchers.IO) {
         val timeRange = TimeRangeFilter.between(startTime, endTime)
+        // Sleep uses a separate noon-to-noon window (Samsung Health style)
+        val sleepTimeRange = TimeRangeFilter.between(sleepStartTime, sleepEndTime)
         val all = selectedTypeKeys.isEmpty()
         HealthDataPayload(
             steps = if (all || "steps" in selectedTypeKeys) readSteps(timeRange) else emptyList(),
             heart_rate = if (all || "heart_rate" in selectedTypeKeys) readHeartRate(timeRange) else emptyList(),
-            sleep = if (all || "sleep" in selectedTypeKeys) readSleep(timeRange) else emptyList(),
+            sleep = if (all || "sleep" in selectedTypeKeys) readSleep(sleepTimeRange) else emptyList(),
             blood_pressure = if (all || "blood_pressure" in selectedTypeKeys) readBloodPressure(timeRange) else emptyList(),
             weight = if (all || "weight" in selectedTypeKeys) readWeight(timeRange) else emptyList(),
             calories = if (all || "calories" in selectedTypeKeys) readCalories(timeRange) else emptyList(),

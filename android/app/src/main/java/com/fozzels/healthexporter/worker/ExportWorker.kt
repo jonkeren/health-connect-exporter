@@ -82,8 +82,13 @@ class ExportWorker @AssistedInject constructor(
             val startTime = exportDate.atStartOfDay(zoneId).toInstant()
             val endTime = exportDate.plusDays(1).atStartOfDay(zoneId).toInstant()
 
+            // Sleep window: noon yesterday → noon today (Samsung Health style).
+            // Overnight sleep is attributed to the day you wake up.
+            val sleepStartTime = exportDate.atTime(12, 0).atZone(zoneId).minusDays(1).toInstant()
+            val sleepEndTime = exportDate.atTime(12, 0).atZone(zoneId).toInstant()
+
             // Read health data
-            val healthData = healthConnectManager.readHealthData(startTime, endTime)
+            val healthData = healthConnectManager.readHealthData(startTime, endTime, sleepStartTime, sleepEndTime)
 
             val exportPayload = HealthExportData(
                 export_date = dateStr,

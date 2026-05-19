@@ -132,7 +132,11 @@ class HistoricalSyncWorker @AssistedInject constructor(
                     val startTime = currentDate.atStartOfDay(zoneId).toInstant()
                     val endTime = currentDate.plusDays(1).atStartOfDay(zoneId).toInstant()
 
-                    val healthData = healthConnectManager.readHealthDataForTypes(startTime, endTime, selectedTypes)
+                    // Sleep window: noon yesterday → noon today (Samsung Health style).
+                    val sleepStartTime = currentDate.atTime(12, 0).atZone(zoneId).minusDays(1).toInstant()
+                    val sleepEndTime = currentDate.atTime(12, 0).atZone(zoneId).toInstant()
+
+                    val healthData = healthConnectManager.readHealthDataForTypes(startTime, endTime, selectedTypes, sleepStartTime, sleepEndTime)
 
                     val exportPayload = HealthExportData(
                         export_date = dateStr,
