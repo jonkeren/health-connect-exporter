@@ -321,59 +321,88 @@ class HealthConnectManager @Inject constructor(
     } catch (e: Exception) { emptyList() }
 
     private suspend fun readExerciseSessions(timeRange: TimeRangeFilter): List<ExerciseSessionEntry> = try {
-        healthConnectClient.readRecords(ReadRecordsRequest(ExerciseSessionRecord::class, timeRange))
-            .records.map { r ->
-                // Calculate duration in seconds
-                val durationSeconds = (r.endTime.epochSecond - r.startTime.epochSecond).toDouble()
+        val sessions = healthConnectClient.readRecords(ReadRecordsRequest(ExerciseSessionRecord::class, timeRange)).records
 
-                // Extract GPS route if available (Health Connect 1.1.0+)
-                // Wrapped in try-catch: READ_EXERCISE_ROUTES permission may not be granted,
-                // which would otherwise crash the entire exercise_sessions read.
-                val routePoints: List<RoutePoint>? = try {
-                    val routeData = r.exerciseRouteResult
-                    when (routeData) {
-                        is ExerciseRouteResult.Data -> routeData.exerciseRoute.route.map { loc ->
-                            RoutePoint(
-                                lat = loc.latitude,
-                                lng = loc.longitude,
-                                alt = loc.altitude?.inMeters,
-                                time = loc.time.toString()
-                            )
-                        }
-                        else -> null
+        // Pre-fetch distance and calorie records for the whole window, then match per session.
+        // Samsung Health writes distance/calories as separate records, not inside ExerciseSessionRecord.
+        val allDistance = try {
+            healthConnectClient.readRecords(ReadRecordsRequest(DistanceRecord::class, timeRange)).records
+        } catch (e: Exception) { emptyList() }
+
+        val allActiveCalories = try {
+            healthConnectClient.readRecords(ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, timeRange)).records
+        } catch (e: Exception) { emptyList() }
+
+        sessions.map { r ->
+            val durationSeconds = (r.endTime.epochSecond - r.startTime.epochSecond).toDouble()
+            val sessionRange = r.startTime..r.endTime
+
+            // Match distance records that overlap this session window
+            val sessionDistanceMeters: Double? = allDistance
+                .filter { d -> d.startTime < r.endTime && d.endTime > r.startTime }
+                .sumOf { d -> d.distance.inMeters }
+                .takeIf { it > 0.0 }
+
+            // Match active calorie records that overlap this session window
+            val sessionCalories: Double? = allActiveCalories
+                .filter { c -> c.startTime < r.endTime && c.endTime > r.startTime }
+                .sumOf { c -> c.energy.inKilocalories }
+                .takeIf { it > 0.0 }
+
+            // Extract GPS route if available (Health Connect 1.1.0+)
+            // Wrapped in try-catch: READ_EXERCISE_ROUTES permission may not be granted,
+            // which would otherwise crash the entire exercise_sessions read.
+            val routePoints: List<RoutePoint>? = try {
+                val routeData = r.exerciseRouteResult
+                when (routeData) {
+                    is ExerciseRouteResult.Data -> routeData.exerciseRoute.route.map { loc ->
+                        RoutePoint(
+                            lat = loc.latitude,
+                            lng = loc.longitude,
+                            alt = loc.altitude?.inMeters,
+                            time = loc.time.toString()
+                        )
                     }
-                } catch (e: Exception) { null }
-                val hasGps = !routePoints.isNullOrEmpty()
+                    is ExerciseRouteResult.ConsentRequired -> null // UI consent needed; handled in MainActivity
+                    else -> null
+                }
+            } catch (e: Exception) { null }
+            val hasGps = !routePoints.isNullOrEmpty()
 
-                // Calculate distance from GPS points (Haversine)
-                val distanceFromRoute: Double? = if (hasGps && routePoints != null && routePoints.size >= 2) {
-                    var total = 0.0
-                    for (i in 1 until routePoints.size) {
-                        val prev = routePoints[i - 1]
-                        val curr = routePoints[i]
-                        val dLat = Math.toRadians(curr.lat - prev.lat)
-                        val dLng = Math.toRadians(curr.lng - prev.lng)
-                        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                                Math.cos(Math.toRadians(prev.lat)) * Math.cos(Math.toRadians(curr.lat)) *
-                                Math.sin(dLng / 2) * Math.sin(dLng / 2)
-                        total += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-                    }
-                    total
-                } else null
+            // Calculate distance from GPS points (Haversine) — use as fallback if no DistanceRecord
+            val distanceFromRoute: Double? = if (hasGps && routePoints != null && routePoints.size >= 2) {
+                var total = 0.0
+                for (i in 1 until routePoints.size) {
+                    val prev = routePoints[i - 1]
+                    val curr = routePoints[i]
+                    val dLat = Math.toRadians(curr.lat - prev.lat)
+                    val dLng = Math.toRadians(curr.lng - prev.lng)
+                    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                            Math.cos(Math.toRadians(prev.lat)) * Math.cos(Math.toRadians(curr.lat)) *
+                            Math.sin(dLng / 2) * Math.sin(dLng / 2)
+                    total += 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+                }
+                total
+            } else null
 
-                val avgSpeed = if (distanceFromRoute != null && durationSeconds > 0)
-                    distanceFromRoute / durationSeconds else null
+            // Prefer DistanceRecord distance; fall back to GPS-calculated distance
+            val finalDistance = sessionDistanceMeters ?: distanceFromRoute
 
-                ExerciseSessionEntry(
-                    start = r.startTime.toString(),
-                    end = r.endTime.toString(),
-                    type = exerciseTypeToString(r.exerciseType),
-                    title = r.title,
-                    hasGps = hasGps,
-                    route = routePoints,
-                    distanceMeters = distanceFromRoute,
-                    avgSpeedMs = avgSpeed
-                )
-            }
+            val avgSpeed = if (finalDistance != null && durationSeconds > 0)
+                finalDistance / durationSeconds else null
+
+            ExerciseSessionEntry(
+                start = r.startTime.toString(),
+                end = r.endTime.toString(),
+                type = exerciseTypeToString(r.exerciseType),
+                title = r.title,
+                calories = sessionCalories,
+                hasGps = hasGps,
+                route = routePoints,
+                distanceMeters = finalDistance,
+                avgSpeedMs = avgSpeed
+            )
+        }
     } catch (e: Exception) { emptyList() }
 }
+
