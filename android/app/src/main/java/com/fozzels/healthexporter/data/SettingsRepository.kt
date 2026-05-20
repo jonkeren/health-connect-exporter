@@ -8,6 +8,7 @@ import com.fozzels.healthexporter.model.ExportSettings
 import com.fozzels.healthexporter.model.ExportTarget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,6 +28,7 @@ class SettingsRepository @Inject constructor(
         val EXPORT_HOUR = intPreferencesKey("export_hour")
         val EXPORT_MINUTE = intPreferencesKey("export_minute")
         val IS_EXPORT_ENABLED = booleanPreferencesKey("is_export_enabled")
+        val FIT_ACCOUNT_EMAIL = stringPreferencesKey("fit_account_email")
     }
 
     val settings: Flow<ExportSettings> = context.dataStore.data.map { prefs ->
@@ -42,6 +44,10 @@ class SettingsRepository @Inject constructor(
             exportMinute = prefs[Keys.EXPORT_MINUTE] ?: 0,
             isExportEnabled = prefs[Keys.IS_EXPORT_ENABLED] ?: true
         )
+    }
+
+    val fitAccountEmail: Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[Keys.FIT_ACCOUNT_EMAIL] ?: ""
     }
 
     suspend fun saveSettings(settings: ExportSettings) {
@@ -67,5 +73,23 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { prefs ->
             prefs[Keys.DRIVE_FOLDER_ID] = folderId
         }
+    }
+
+    suspend fun saveFitAccountEmail(email: String) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.FIT_ACCOUNT_EMAIL] = email
+        }
+    }
+
+    suspend fun clearFitAccountEmail() {
+        context.dataStore.edit { prefs ->
+            prefs.remove(Keys.FIT_ACCOUNT_EMAIL)
+        }
+    }
+
+    suspend fun getFitAccountEmail(): String {
+        return context.dataStore.data.map { prefs ->
+            prefs[Keys.FIT_ACCOUNT_EMAIL] ?: ""
+        }.first()
     }
 }
