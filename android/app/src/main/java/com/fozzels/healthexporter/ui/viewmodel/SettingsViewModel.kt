@@ -2,14 +2,19 @@ package com.fozzels.healthexporter.ui.viewmodel
 
 import android.accounts.AccountManager
 import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fozzels.healthexporter.data.GoogleFitManager
 import com.fozzels.healthexporter.data.SettingsRepository
 import com.fozzels.healthexporter.model.ExportSettings
 import com.fozzels.healthexporter.model.ExportTarget
 import com.fozzels.healthexporter.service.DriveExportService
 import com.fozzels.healthexporter.service.DriveFolder
 import com.fozzels.healthexporter.service.HttpExportService
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -19,6 +24,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -28,7 +34,9 @@ data class SettingsUiState(
     val snackbarMessage: String? = null,
     val driveFolders: List<DriveFolder> = emptyList(),
     val isLoadingFolders: Boolean = false,
-    val showFolderPicker: Boolean = false
+    val showFolderPicker: Boolean = false,
+    val fitAccountEmail: String = "",
+    val isConnectingFit: Boolean = false
 )
 
 @HiltViewModel
@@ -36,7 +44,8 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val driveExportService: DriveExportService,
-    private val okHttpClient: OkHttpClient
+    private val okHttpClient: OkHttpClient,
+    private val googleFitManager: GoogleFitManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
@@ -46,6 +55,21 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.settings.collect { settings ->
                 _uiState.update { it.copy(settings = settings) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.fitAccountEmail.collect { email ->
+                _uiState.update { it.copy(fitAccountEmail = email) }
+            }
+        }
+        // Sync runtime sign-in state with persisted email on init
+        viewModelScope.launch {
+            val runtimeEmail = googleFitManager.getSignedInEmail() ?: ""
+            val storedEmail = settingsRepository.getFitAccountEmail()
+            if (runtimeEmail.isNotBlank() && storedEmail.isBlank()) {
+                settingsRepository.saveFitAccountEmail(runtimeEmail)
+            } else if (runtimeEmail.isBlank() && storedEmail.isNotBlank()) {
+                settingsRepository.clearFitAccountEmail()
             }
         }
     }
@@ -79,6 +103,57 @@ class SettingsViewModel @Inject constructor(
                     settings = it.settings.copy(driveAccountEmail = "", driveFolderId = ""),
                     snackbarMessage = "Google account removed"
                 )
+            }
+        }
+    }
+
+    /** Returns the Intent to launch Google Sign-In for Fitness scopes. */
+    fun getFitSignInIntent(): Intent {
+        val fitnessOptions = GoogleFitManager.buildFitnessOptions()
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestEmail()
+            .addExtension(fitnessOptions)
+            .build()
+        val client: GoogleSignInClient = GoogleSignIn.getClient(context, gso)
+        return client.signInIntent
+    }
+
+    fun onFitSignInResult(data: android.content.Intent?) {
+        viewModelScope.launch {
+            try {
+                val account = GoogleSignIn.getSignedInAccountFromIntent(data).await()
+                val email = account?.email ?: ""
+                settingsRepository.saveFitAccountEmail(email)
+                _uiState.update {
+                    it.copy(
+                        fitAccountEmail = email,
+                        snackbarMessage = if (email.isNotBlank()) "Google Fit connected: $email"
+                        else "Google Fit sign-in failed"
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(snackbarMessage = "Google Fit sign-in failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun disconnectFit() {
+        viewModelScope.launch {
+            try {
+                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestEmail()
+                    .addExtension(GoogleFitManager.buildFitnessOptions())
+                    .build()
+                val client = GoogleSignIn.getClient(context, gso)
+                client.signOut().await()
+            } catch (e: Exception) {
+                // Best-effort sign-out
+            }
+            settingsRepository.clearFitAccountEmail()
+            _uiState.update {
+                it.copy(fitAccountEmail = "", snackbarMessage = "Google Fit disconnected")
             }
         }
     }
