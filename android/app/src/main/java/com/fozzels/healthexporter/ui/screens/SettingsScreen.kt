@@ -38,6 +38,16 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         }
     }
 
+    val fitSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            viewModel.onFitSignInResult(result.data)
+        } else {
+            viewModel.onFitSignInResult(null)
+        }
+    }
+
     LaunchedEffect(uiState.snackbarMessage) {
         uiState.snackbarMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -259,6 +269,66 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                                     Text(folderLabel)
                                 }
                             }
+                        }
+                    }
+                }
+            }
+
+            // Google Fit GPS section
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Filled.DirectionsRun,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Google Fit GPS Routes",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Text(
+                            "Connect Google Fit to enrich workouts with GPS routes when Health Connect doesn't have them (e.g. Samsung Health workouts).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        if (uiState.fitAccountEmail.isBlank()) {
+                            Button(
+                                onClick = { fitSignInLauncher.launch(viewModel.getFitSignInIntent()) },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.AccountCircle, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text("Connect Google Fit for GPS routes")
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("Connected as", style = MaterialTheme.typography.labelSmall)
+                                    Text(
+                                        uiState.fitAccountEmail,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                                TextButton(onClick = viewModel::disconnectFit) {
+                                    Text("Disconnect")
+                                }
+                            }
+                            Text(
+                                "✓ GPS routes will be fetched from Google Fit when Health Connect has none.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 }
