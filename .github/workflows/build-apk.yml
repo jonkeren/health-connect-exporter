@@ -27,33 +27,30 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
-      - name: Build debug APK
+      - name: Decode release keystore
+        run: |
+          echo "${{ secrets.RELEASE_KEYSTORE_B64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Build release APK
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file=$(pwd)/app/release.keystore \
+            -Pandroid.injected.signing.store.password=${{ secrets.RELEASE_STORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.RELEASE_KEY_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.RELEASE_KEY_PASSWORD }}
 
-      - name: Print debug signing certificate SHA-1 (needed for Google OAuth setup)
+      - name: Print release signing certificate SHA-256
         run: |
-          APK=android/app/build/outputs/apk/debug/app-debug.apk
-          # Extract the cert from the APK and print SHA-1
-          unzip -p $APK META-INF/*.RSA META-INF/*.DSA META-INF/*.EC 2>/dev/null | \
-            keytool -printcert | grep -E 'SHA1|SHA-1' || true
-          # Also try the standard debug keystore locations
-          for KS in ~/.android/debug.keystore $ANDROID_SDK_ROOT/debug.keystore $HOME/.gradle/debug.keystore; do
-            if [ -f "$KS" ]; then
-              echo "Found keystore at $KS"
-              keytool -list -v -keystore $KS -alias androiddebugkey -storepass android -keypass android | grep -E 'SHA1|SHA-1'
-            fi
-          done
-          # Fallback: find any debug.keystore on the runner
-          find / -name "debug.keystore" 2>/dev/null | head -5 | while read KS; do
-            echo "Found: $KS"
-            keytool -list -v -keystore $KS -alias androiddebugkey -storepass android -keypass android 2>/dev/null | grep -E 'SHA1|SHA-1' || true
-          done
+          keytool -list -v \
+            -keystore android/app/release.keystore \
+            -alias ${{ secrets.RELEASE_KEY_ALIAS }} \
+            -storepass ${{ secrets.RELEASE_STORE_PASSWORD }} \
+            | grep -E "SHA1|SHA256"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: health-connect-exporter-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: health-connect-exporter-release
+          path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 30
