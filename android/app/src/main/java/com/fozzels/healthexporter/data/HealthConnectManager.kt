@@ -347,11 +347,25 @@ class HealthConnectManager @Inject constructor(
         sessions.map { r ->
             val durationSeconds = (r.endTime.epochSecond - r.startTime.epochSecond).toDouble()
 
-            // Match distance records that overlap this session window
-            val sessionDistanceMeters: Double? = allDistance
+            // Match distance records for this session.
+            // Strategy: prefer an exact start+end match (avoids double-counting when Samsung Health
+            // and Google Fit both write a DistanceRecord for the same window). Fall back to the
+            // largest single overlapping record so we never sum duplicates.
+            val overlappingDistance = allDistance
                 .filter { d -> d.startTime < r.endTime && d.endTime > r.startTime }
-                .sumOf { d -> d.distance.inMeters }
-                .takeIf { it > 0.0 }
+            val sessionDistanceMeters: Double? = run {
+                // 1. Exact match on session boundaries
+                val exact = overlappingDistance.filter { d ->
+                    d.startTime == r.startTime && d.endTime == r.endTime
+                }
+                if (exact.isNotEmpty()) {
+                    // De-duplicate by value (two sources may write identical records)
+                    exact.map { it.distance.inMeters }.toSet().sum().takeIf { it > 0.0 }
+                } else {
+                    // Fall back: take the single largest record (avoids summing partial segments)
+                    overlappingDistance.maxOfOrNull { it.distance.inMeters }?.takeIf { it > 0.0 }
+                }
+            }
 
             // Match active calorie records that overlap this session window
             val sessionCalories: Double? = allActiveCalories
@@ -428,3 +442,4 @@ class HealthConnectManager @Inject constructor(
         }
     } catch (e: Exception) { emptyList() }
 }
+
