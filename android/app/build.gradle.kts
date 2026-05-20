@@ -102,11 +102,16 @@ dependencies {
 
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     // Credential Manager + Google Identity Services
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.googleid)
+
+    // Google Play Services - Auth + Fitness
+    implementation(libs.play.services.auth)
+    implementation(libs.play.services.fitness)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
