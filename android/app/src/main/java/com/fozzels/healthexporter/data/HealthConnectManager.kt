@@ -133,7 +133,8 @@ class HealthConnectManager @Inject constructor(
         startTime: Instant,
         endTime: Instant,
         sleepStartTime: Instant = startTime,
-        sleepEndTime: Instant = endTime
+        sleepEndTime: Instant = endTime,
+        googleFitManager: GoogleFitManager? = null
     ): HealthDataPayload =
         withContext(Dispatchers.IO) {
             val timeRange = TimeRangeFilter.between(startTime, endTime)
@@ -154,7 +155,7 @@ class HealthConnectManager @Inject constructor(
                 body_temperature = readBodyTemperature(timeRange),
                 hydration = readHydration(timeRange),
                 nutrition = readNutrition(timeRange),
-                exercise_sessions = readExerciseSessions(timeRange)
+                exercise_sessions = readExerciseSessions(timeRange, googleFitManager)
             )
         }
 
@@ -163,7 +164,8 @@ class HealthConnectManager @Inject constructor(
         endTime: Instant,
         selectedTypeKeys: Set<String>,
         sleepStartTime: Instant = startTime,
-        sleepEndTime: Instant = endTime
+        sleepEndTime: Instant = endTime,
+        googleFitManager: GoogleFitManager? = null
     ): HealthDataPayload = withContext(Dispatchers.IO) {
         val timeRange = TimeRangeFilter.between(startTime, endTime)
         // Sleep uses a separate noon-to-noon window (Samsung Health style)
@@ -183,7 +185,9 @@ class HealthConnectManager @Inject constructor(
             body_temperature = if (all || "body_temperature" in selectedTypeKeys) readBodyTemperature(timeRange) else emptyList(),
             hydration = if (all || "hydration" in selectedTypeKeys) readHydration(timeRange) else emptyList(),
             nutrition = if (all || "nutrition" in selectedTypeKeys) readNutrition(timeRange) else emptyList(),
-            exercise_sessions = if (all || "exercise_sessions" in selectedTypeKeys) readExerciseSessions(timeRange) else emptyList()
+            exercise_sessions = if (all || "exercise_sessions" in selectedTypeKeys)
+                readExerciseSessions(timeRange, googleFitManager)
+            else emptyList()
         )
     }
 
@@ -320,8 +324,13 @@ class HealthConnectManager @Inject constructor(
             }
     } catch (e: Exception) { emptyList() }
 
-    private suspend fun readExerciseSessions(timeRange: TimeRangeFilter): List<ExerciseSessionEntry> = try {
-        val sessions = healthConnectClient.readRecords(ReadRecordsRequest(ExerciseSessionRecord::class, timeRange)).records
+    private suspend fun readExerciseSessions(
+        timeRange: TimeRangeFilter,
+        googleFitManager: GoogleFitManager? = null
+    ): List<ExerciseSessionEntry> = try {
+        val sessions = healthConnectClient.readRecords(
+            ReadRecordsRequest(ExerciseSessionRecord::class, timeRange)
+        ).records
 
         // Pre-fetch distance and calorie records for the whole window, then match per session.
         // Samsung Health writes distance/calories as separate records, not inside ExerciseSessionRecord.
@@ -330,12 +339,13 @@ class HealthConnectManager @Inject constructor(
         } catch (e: Exception) { emptyList() }
 
         val allActiveCalories = try {
-            healthConnectClient.readRecords(ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, timeRange)).records
+            healthConnectClient.readRecords(
+                ReadRecordsRequest(ActiveCaloriesBurnedRecord::class, timeRange)
+            ).records
         } catch (e: Exception) { emptyList() }
 
         sessions.map { r ->
             val durationSeconds = (r.endTime.epochSecond - r.startTime.epochSecond).toDouble()
-            val sessionRange = r.startTime..r.endTime
 
             // Match distance records that overlap this session window
             val sessionDistanceMeters: Double? = allDistance
@@ -352,7 +362,7 @@ class HealthConnectManager @Inject constructor(
             // Extract GPS route if available (Health Connect 1.1.0+)
             // Wrapped in try-catch: READ_EXERCISE_ROUTES permission may not be granted,
             // which would otherwise crash the entire exercise_sessions read.
-            val routePoints: List<RoutePoint>? = try {
+            val hcRoutePoints: List<RoutePoint>? = try {
                 val routeData = r.exerciseRouteResult
                 when (routeData) {
                     is ExerciseRouteResult.Data -> routeData.exerciseRoute.route.map { loc ->
@@ -367,6 +377,19 @@ class HealthConnectManager @Inject constructor(
                     else -> null
                 }
             } catch (e: Exception) { null }
+
+            // If Health Connect has no GPS route, try Google Fit as fallback
+            val routePoints: List<RoutePoint>? = if (!hcRoutePoints.isNullOrEmpty()) {
+                hcRoutePoints
+            } else if (googleFitManager != null && googleFitManager.isSignedIn()) {
+                googleFitManager.getRouteForSession(
+                    r.startTime.toEpochMilli(),
+                    r.endTime.toEpochMilli()
+                )
+            } else {
+                null
+            }
+
             val hasGps = !routePoints.isNullOrEmpty()
 
             // Calculate distance from GPS points (Haversine) — use as fallback if no DistanceRecord
@@ -405,4 +428,3 @@ class HealthConnectManager @Inject constructor(
         }
     } catch (e: Exception) { emptyList() }
 }
-
