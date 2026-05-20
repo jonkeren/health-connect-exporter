@@ -32,9 +32,18 @@ class GoogleFitManager @Inject constructor(
             .build()
     }
 
+    /**
+     * Returns true if a Google account is signed in AND has Fitness permissions.
+     * Falls back to just checking for any signed-in account so token acquisition
+     * can still be attempted (token request itself will fail if scopes are missing).
+     */
     fun isSignedIn(): Boolean {
         val account = GoogleSignIn.getLastSignedInAccount(context) ?: return false
-        return GoogleSignIn.hasPermissions(account, buildFitnessOptions())
+        // Primary check: proper Fitness permissions granted
+        if (GoogleSignIn.hasPermissions(account, buildFitnessOptions())) return true
+        // Fallback: account exists — try anyway; getRouteForSession will return null on auth failure
+        Log.d(TAG, "Account present (${account.email}) but Fitness permissions not confirmed; will attempt anyway")
+        return true
     }
 
     fun getSignedInEmail(): String? {
@@ -45,9 +54,11 @@ class GoogleFitManager @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val account = GoogleSignIn.getLastSignedInAccount(context)
-                    ?: return@withContext null
+                    ?: run { Log.w(TAG, "No signed-in account"); return@withContext null }
                 val androidAccount = account.account
-                    ?: return@withContext null
+                    ?: run { Log.w(TAG, "Account has no Android account"); return@withContext null }
+
+                Log.d(TAG, "Fetching Fit route for session $startTimeMs-$endTimeMs as ${account.email}")
 
                 // Obtain access token for Fitness scopes
                 val token = try {
@@ -60,6 +71,8 @@ class GoogleFitManager @Inject constructor(
                 // Convert ms to ns for Fit REST API
                 val startNs = startTimeMs * 1_000_000L
                 val endNs = endTimeMs * 1_000_000L
+
+                Log.d(TAG, "Querying Fit datasource for ns range $startNs-$endNs")
 
                 val url = "https://www.googleapis.com/fitness/v1/users/me/dataSources/" +
                         "derived:com.google.location.sample:com.google.android.gms:" +
@@ -81,8 +94,14 @@ class GoogleFitManager @Inject constructor(
                 val body = response.body?.string()
                 response.close()
 
-                if (body.isNullOrBlank()) return@withContext null
-                parseLocationDataset(body)
+                if (body.isNullOrBlank()) {
+                    Log.w(TAG, "Empty response from Fit API")
+                    return@withContext null
+                }
+
+                val result = parseLocationDataset(body)
+                Log.d(TAG, "Parsed ${result?.size ?: 0} route points for session $startTimeMs-$endTimeMs")
+                result
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get Fit route", e)
                 null
