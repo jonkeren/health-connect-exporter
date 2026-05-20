@@ -8,6 +8,7 @@ import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.fozzels.healthexporter.data.ExportRepository
+import com.fozzels.healthexporter.data.GoogleFitManager
 import com.fozzels.healthexporter.data.HealthConnectManager
 import com.fozzels.healthexporter.data.SettingsRepository
 import com.fozzels.healthexporter.model.*
@@ -32,7 +33,8 @@ class HistoricalSyncWorker @AssistedInject constructor(
     private val settingsRepository: SettingsRepository,
     private val exportRepository: ExportRepository,
     private val httpExportService: HttpExportService,
-    private val driveExportService: DriveExportService
+    private val driveExportService: DriveExportService,
+    private val googleFitManager: GoogleFitManager
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -105,6 +107,9 @@ class HistoricalSyncWorker @AssistedInject constructor(
         val endDate = LocalDate.parse(endDateStr, DATE_FMT)
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
 
+        // Use GoogleFitManager only if signed in (GPS fallback for Samsung Health workouts)
+        val fitManager = googleFitManager.takeIf { it.isSignedIn() }
+
         val recordCounts = mutableMapOf<String, Int>()
         val failedDates = mutableListOf<String>()
         var daysProcessed = 0
@@ -136,7 +141,9 @@ class HistoricalSyncWorker @AssistedInject constructor(
                     val sleepStartTime = currentDate.atTime(12, 0).atZone(zoneId).minusDays(1).toInstant()
                     val sleepEndTime = currentDate.atTime(12, 0).atZone(zoneId).toInstant()
 
-                    val healthData = healthConnectManager.readHealthDataForTypes(startTime, endTime, selectedTypes, sleepStartTime, sleepEndTime)
+                    val healthData = healthConnectManager.readHealthDataForTypes(
+                        startTime, endTime, selectedTypes, sleepStartTime, sleepEndTime, fitManager
+                    )
 
                     val exportPayload = HealthExportData(
                         export_date = dateStr,
