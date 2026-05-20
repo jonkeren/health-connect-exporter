@@ -7,6 +7,7 @@ import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.*
 import com.fozzels.healthexporter.data.ExportRepository
+import com.fozzels.healthexporter.data.GoogleFitManager
 import com.fozzels.healthexporter.data.HealthConnectManager
 import com.fozzels.healthexporter.data.SettingsRepository
 import com.fozzels.healthexporter.model.*
@@ -26,7 +27,8 @@ class ExportWorker @AssistedInject constructor(
     private val settingsRepository: SettingsRepository,
     private val exportRepository: ExportRepository,
     private val httpExportService: HttpExportService,
-    private val driveExportService: DriveExportService
+    private val driveExportService: DriveExportService,
+    private val googleFitManager: GoogleFitManager
 ) : CoroutineWorker(context, workerParams) {
 
     companion object {
@@ -87,8 +89,13 @@ class ExportWorker @AssistedInject constructor(
             val sleepStartTime = exportDate.atTime(12, 0).atZone(zoneId).minusDays(1).toInstant()
             val sleepEndTime = exportDate.atTime(12, 0).atZone(zoneId).toInstant()
 
+            // Pass GoogleFitManager only if signed in (provides GPS fallback for Samsung Health workouts)
+            val fitManager = googleFitManager.takeIf { it.isSignedIn() }
+
             // Read health data
-            val healthData = healthConnectManager.readHealthData(startTime, endTime, sleepStartTime, sleepEndTime)
+            val healthData = healthConnectManager.readHealthData(
+                startTime, endTime, sleepStartTime, sleepEndTime, fitManager
+            )
 
             val exportPayload = HealthExportData(
                 export_date = dateStr,
