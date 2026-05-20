@@ -26,29 +26,33 @@ class GoogleFitManager @Inject constructor(
         private const val FITNESS_SCOPE =
             "oauth2:https://www.googleapis.com/auth/fitness.activity.read https://www.googleapis.com/auth/fitness.location.read"
 
+        // Candidate datasources to try in order — Samsung Health writes to a raw source,
+        // Google Fit aggregates into derived sources.
+        private val LOCATION_DATASOURCES = listOf(
+            // Standard derived (merge) — most common
+            "derived:com.google.location.sample:com.google.android.gms:merge_boundary_detected_location",
+            // Raw Samsung Health source
+            "raw:com.google.location.sample:com.sec.android.app.shealth",
+            // Alternative derived
+            "derived:com.google.location.sample:com.google.android.gms:merge_location_samples",
+            // Generic merged
+            "derived:com.google.location.sample:com.google.android.gms"
+        )
+
         fun buildFitnessOptions(): FitnessOptions = FitnessOptions.builder()
             .addDataType(DataType.TYPE_LOCATION_SAMPLE, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_ACTIVITY_SEGMENT, FitnessOptions.ACCESS_READ)
             .build()
     }
 
-    /**
-     * Returns true if a Google account is signed in AND has Fitness permissions.
-     * Falls back to just checking for any signed-in account so token acquisition
-     * can still be attempted (token request itself will fail if scopes are missing).
-     */
     fun isSignedIn(): Boolean {
         val account = GoogleSignIn.getLastSignedInAccount(context) ?: return false
-        // Primary check: proper Fitness permissions granted
         if (GoogleSignIn.hasPermissions(account, buildFitnessOptions())) return true
-        // Fallback: account exists — try anyway; getRouteForSession will return null on auth failure
         Log.d(TAG, "Account present (${account.email}) but Fitness permissions not confirmed; will attempt anyway")
         return true
     }
 
-    fun getSignedInEmail(): String? {
-        return GoogleSignIn.getLastSignedInAccount(context)?.email
-    }
+    fun getSignedInEmail(): String? = GoogleSignIn.getLastSignedInAccount(context)?.email
 
     suspend fun getRouteForSession(startTimeMs: Long, endTimeMs: Long): List<RoutePoint>? =
         withContext(Dispatchers.IO) {
@@ -60,7 +64,6 @@ class GoogleFitManager @Inject constructor(
 
                 Log.d(TAG, "Fetching Fit route for session $startTimeMs-$endTimeMs as ${account.email}")
 
-                // Obtain access token for Fitness scopes
                 val token = try {
                     GoogleAuthUtil.getToken(context, androidAccount, FITNESS_SCOPE)
                 } catch (e: Exception) {
@@ -68,45 +71,81 @@ class GoogleFitManager @Inject constructor(
                     return@withContext null
                 }
 
-                // Convert ms to ns for Fit REST API
                 val startNs = startTimeMs * 1_000_000L
-                val endNs = endTimeMs * 1_000_000L
+                val endNs   = endTimeMs   * 1_000_000L
 
-                Log.d(TAG, "Querying Fit datasource for ns range $startNs-$endNs")
+                // Try each candidate datasource until we get points
+                for (datasource in LOCATION_DATASOURCES) {
+                    val url = "https://www.googleapis.com/fitness/v1/users/me/dataSources/" +
+                            "$datasource/datasets/$startNs-$endNs"
 
-                val url = "https://www.googleapis.com/fitness/v1/users/me/dataSources/" +
-                        "derived:com.google.location.sample:com.google.android.gms:" +
-                        "merge_boundary_detected_location/datasets/$startNs-$endNs"
+                    Log.d(TAG, "Trying datasource: $datasource")
 
-                val request = Request.Builder()
-                    .url(url)
-                    .header("Authorization", "Bearer $token")
-                    .get()
-                    .build()
+                    val request = Request.Builder()
+                        .url(url)
+                        .header("Authorization", "Bearer $token")
+                        .get()
+                        .build()
 
-                val response = okHttpClient.newCall(request).execute()
-                if (!response.isSuccessful) {
-                    Log.w(TAG, "Fit API returned ${response.code} for session $startTimeMs-$endTimeMs")
+                    val response = okHttpClient.newCall(request).execute()
+                    val code = response.code
+                    val body = response.body?.string()
                     response.close()
-                    return@withContext null
+
+                    if (code == 404) {
+                        Log.d(TAG, "Datasource not found (404): $datasource")
+                        continue
+                    }
+                    if (!response.isSuccessful) {
+                        Log.w(TAG, "Fit API returned $code for $datasource")
+                        continue
+                    }
+                    if (body.isNullOrBlank()) continue
+
+                    val result = parseLocationDataset(body)
+                    if (!result.isNullOrEmpty()) {
+                        Log.d(TAG, "Got ${result.size} route points from $datasource")
+                        return@withContext result
+                    }
+                    Log.d(TAG, "Datasource $datasource returned 0 points")
                 }
 
-                val body = response.body?.string()
-                response.close()
-
-                if (body.isNullOrBlank()) {
-                    Log.w(TAG, "Empty response from Fit API")
-                    return@withContext null
-                }
-
-                val result = parseLocationDataset(body)
-                Log.d(TAG, "Parsed ${result?.size ?: 0} route points for session $startTimeMs-$endTimeMs")
-                result
+                // Nothing found — log available location datasources for debugging
+                logAvailableDatasources(token, startNs, endNs)
+                null
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get Fit route", e)
                 null
             }
         }
+
+    /** Logs all available datasources that contain location data (for debugging empty results). */
+    private fun logAvailableDatasources(token: String, startNs: Long, endNs: Long) {
+        try {
+            val req = Request.Builder()
+                .url("https://www.googleapis.com/fitness/v1/users/me/dataSources")
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            val resp = okHttpClient.newCall(req).execute()
+            val body = resp.body?.string()
+            resp.close()
+            if (body.isNullOrBlank()) return
+            val root = JSONObject(body)
+            val sources = root.optJSONArray("dataSource") ?: return
+            Log.d(TAG, "Available datasources (${sources.length()} total):")
+            for (i in 0 until sources.length()) {
+                val s = sources.getJSONObject(i)
+                val id = s.optString("dataStreamId")
+                val typeName = s.optJSONObject("dataType")?.optString("name") ?: ""
+                if ("location" in id.lowercase() || "location" in typeName.lowercase()) {
+                    Log.d(TAG, "  [LOCATION] $id  ($typeName)")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to list datasources: ${e.message}")
+        }
+    }
 
     private fun parseLocationDataset(json: String): List<RoutePoint>? {
         return try {
@@ -129,19 +168,14 @@ class GoogleFitManager @Inject constructor(
                         0 -> lat = v.optDouble("fpVal").takeIf { !it.isNaN() }
                         1 -> lng = v.optDouble("fpVal").takeIf { !it.isNaN() }
                         2 -> alt = v.optDouble("fpVal").takeIf { !it.isNaN() }
-                        // index 3 = accuracy, skip
                     }
                 }
 
                 if (lat != null && lng != null) {
-                    result.add(
-                        RoutePoint(
-                            lat = lat,
-                            lng = lng,
-                            alt = alt,
-                            time = java.time.Instant.ofEpochSecond(0, startTimeNs).toString()
-                        )
-                    )
+                    result.add(RoutePoint(
+                        lat = lat, lng = lng, alt = alt,
+                        time = java.time.Instant.ofEpochSecond(0, startTimeNs).toString()
+                    ))
                 }
             }
 
