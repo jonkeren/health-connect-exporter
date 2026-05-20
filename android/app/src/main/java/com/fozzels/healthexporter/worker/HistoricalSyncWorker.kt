@@ -2,6 +2,7 @@ package com.fozzels.healthexporter.worker
 
 import android.app.NotificationManager
 import android.content.Context
+import android.util.Log
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -108,7 +109,9 @@ class HistoricalSyncWorker @AssistedInject constructor(
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
 
         // Use GoogleFitManager only if signed in (GPS fallback for Samsung Health workouts)
-        val fitManager = googleFitManager.takeIf { it.isSignedIn() }
+        val fitSignedIn = googleFitManager.isSignedIn()
+        Log.d("HealthExporter", "GoogleFit isSignedIn=$fitSignedIn email=${googleFitManager.getSignedInEmail()}")
+        val fitManager = googleFitManager.takeIf { fitSignedIn }
 
         val recordCounts = mutableMapOf<String, Int>()
         val failedDates = mutableListOf<String>()
@@ -244,3 +247,4 @@ class HistoricalSyncWorker @AssistedInject constructor(
         }
     }
 }
+
