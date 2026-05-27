@@ -52,12 +52,28 @@ class SamsungHealthManager @Inject constructor(
             runCatching { s.getGrantedPermissions(PERMISSIONS) }.getOrDefault(emptySet())
         }
 
-    suspend fun requestPermissions(activity: Activity): Set<Permission> =
+    /**
+     * Launch Samsung Health permissions screen.
+     * Tries multiple strategies to get a valid Activity reference.
+     */
+    suspend fun requestPermissions(context: Context): Set<Permission> =
         withContext(Dispatchers.Main) {
             val s = store ?: run {
-                android.util.Log.w("SamsungHealth", "requestPermissions: store is null, Samsung Health not available")
+                android.util.Log.w("SamsungHealth", "requestPermissions: store is null")
                 return@withContext emptySet()
             }
+            // Strategy: find Activity from context chain
+            var ctx: android.content.Context = context
+            var activity: Activity? = null
+            while (ctx is android.content.ContextWrapper) {
+                if (ctx is Activity) { activity = ctx; break }
+                ctx = ctx.baseContext
+            }
+            if (activity == null) {
+                android.util.Log.e("SamsungHealth", "requestPermissions: could not find Activity in context chain")
+                return@withContext emptySet()
+            }
+            android.util.Log.d("SamsungHealth", "requestPermissions: using activity ${activity.javaClass.simpleName}")
             runCatching {
                 s.requestPermissions(PERMISSIONS, activity)
             }.onFailure { e ->
