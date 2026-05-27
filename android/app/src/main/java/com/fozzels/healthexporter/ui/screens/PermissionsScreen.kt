@@ -1,6 +1,7 @@
 package com.fozzels.healthexporter.ui.screens
 
 import android.app.Activity
+import android.content.ContextWrapper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,6 +39,16 @@ private val permissionLabels = mapOf(
     "android.permission.health.READ_NUTRITION" to "Nutrition",
     "android.permission.health.READ_EXERCISE" to "Exercise Sessions"
 )
+
+
+private fun android.content.Context.findActivity(): Activity? {
+    var ctx = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
 
 @Composable
 fun PermissionsScreen(viewModel: PermissionsViewModel = hiltViewModel()) {
@@ -194,7 +205,7 @@ fun PermissionsScreen(viewModel: PermissionsViewModel = hiltViewModel()) {
                     Button(
                         onClick = {
                             scope.launch {
-                                viewModel.requestSamsungPermissions(context as Activity)
+                                context.findActivity()?.let { viewModel.requestSamsungPermissions(it) }
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
