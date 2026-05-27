@@ -31,9 +31,9 @@ class SamsungHealthManager @Inject constructor(
 
     companion object {
         val PERMISSIONS: Set<Permission> = setOf(
-            Permission(DataTypes.EXERCISE, AccessType.READ),
-            Permission(DataTypes.SLEEP, AccessType.READ),
-            Permission(DataTypes.ENERGY_SCORE, AccessType.READ)
+            Permission.of(DataTypes.EXERCISE, AccessType.READ),
+            Permission.of(DataTypes.SLEEP, AccessType.READ),
+            Permission.of(DataTypes.ENERGY_SCORE, AccessType.READ)
         )
     }
 
