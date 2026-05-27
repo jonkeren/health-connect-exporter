@@ -145,8 +145,22 @@ class HistoricalSyncWorker @AssistedInject constructor(
                         startTime, endTime, selectedTypes, sleepStartTime, sleepEndTime, fitManager
                     )
 
-                    // Samsung Health overlay: SH data takes priority over Health Connect
+                    // Samsung Health is primary source for all types; Health Connect is fallback.
                     val fetchAll = selectedTypes.isEmpty()
+                    val shSteps = if (fetchAll || "steps" in selectedTypes)
+                        samsungHealthManager.readSteps(currentDate, currentDate) else emptyList()
+                    val shHeartRate = if (fetchAll || "heart_rate" in selectedTypes)
+                        samsungHealthManager.readHeartRate(startTime, endTime) else emptyList()
+                    val shCalories = if (fetchAll || "calories" in selectedTypes)
+                        samsungHealthManager.readCalories(currentDate, currentDate) else emptyList()
+                    val shDistance = if (fetchAll || "distance" in selectedTypes)
+                        samsungHealthManager.readDistance(currentDate, currentDate) else emptyList()
+                    val shSpO2 = if (fetchAll || "spo2" in selectedTypes)
+                        samsungHealthManager.readSpO2(startTime, endTime) else emptyList()
+                    val shWeight = if (fetchAll || "weight" in selectedTypes)
+                        samsungHealthManager.readWeight(startTime, endTime) else emptyList()
+                    val shSleep = if (fetchAll || "sleep" in selectedTypes)
+                        samsungHealthManager.readSleep(sleepStartTime, sleepEndTime) else emptyList()
                     val shExercise = if (fetchAll || "exercise_sessions" in selectedTypes)
                         samsungHealthManager.readExerciseSessions(startTime, endTime) else emptyList()
                     val shEnergyScore = if (fetchAll || "energy_score" in selectedTypes)
@@ -154,6 +168,13 @@ class HistoricalSyncWorker @AssistedInject constructor(
                     val shSleepScore = if (fetchAll || "sleep_score" in selectedTypes)
                         samsungHealthManager.readSleepScores(sleepStartTime, sleepEndTime) else emptyList()
                     val healthData = hcData.copy(
+                        steps = if (shSteps.isNotEmpty()) shSteps else hcData.steps,
+                        heart_rate = if (shHeartRate.isNotEmpty()) shHeartRate else hcData.heart_rate,
+                        sleep = if (shSleep.isNotEmpty()) shSleep else hcData.sleep,
+                        weight = if (shWeight.isNotEmpty()) shWeight else hcData.weight,
+                        calories = if (shCalories.isNotEmpty()) shCalories else hcData.calories,
+                        distance = if (shDistance.isNotEmpty()) shDistance else hcData.distance,
+                        spo2 = if (shSpO2.isNotEmpty()) shSpO2 else hcData.spo2,
                         exercise_sessions = if (shExercise.isNotEmpty()) shExercise else hcData.exercise_sessions,
                         energy_score = shEnergyScore,
                         sleep_score = shSleepScore
