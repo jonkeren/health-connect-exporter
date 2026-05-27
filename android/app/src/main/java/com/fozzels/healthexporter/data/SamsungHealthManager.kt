@@ -71,7 +71,8 @@ class SamsungHealthManager @Inject constructor(
         withContext(Dispatchers.IO) {
             val s = store ?: return@withContext emptyList()
             runCatching {
-                val filter = LocalDateFilter.of(startDate, endDate)
+                // LocalDateFilter.of is half-open [start, end), so add one day to include endDate.
+                val filter = LocalDateFilter.of(startDate, endDate.plusDays(1))
                 val request = DataTypes.ENERGY_SCORE.readDataRequestBuilder
                     .setLocalDateFilter(filter)
                     .build()

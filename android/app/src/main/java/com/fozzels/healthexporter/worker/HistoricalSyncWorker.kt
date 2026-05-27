@@ -152,7 +152,7 @@ class HistoricalSyncWorker @AssistedInject constructor(
                     val shEnergyScore = if (fetchAll || "energy_score" in selectedTypes)
                         samsungHealthManager.readEnergyScores(currentDate, currentDate) else emptyList()
                     val shSleepScore = if (fetchAll || "sleep_score" in selectedTypes)
-                        samsungHealthManager.readSleepScores(startTime, endTime) else emptyList()
+                        samsungHealthManager.readSleepScores(sleepStartTime, sleepEndTime) else emptyList()
                     val healthData = hcData.copy(
                         exercise_sessions = if (shExercise.isNotEmpty()) shExercise else hcData.exercise_sessions,
                         energy_score = shEnergyScore,

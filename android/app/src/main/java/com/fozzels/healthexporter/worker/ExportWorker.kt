@@ -99,7 +99,7 @@ class ExportWorker @AssistedInject constructor(
             // Samsung Health overlay: SH data takes priority over Health Connect
             val shExercise = samsungHealthManager.readExerciseSessions(startTime, endTime)
             val shEnergyScore = samsungHealthManager.readEnergyScores(exportDate, exportDate)
-            val shSleepScore = samsungHealthManager.readSleepScores(startTime, endTime)
+            val shSleepScore = samsungHealthManager.readSleepScores(sleepStartTime, sleepEndTime)
             val healthData = hcData.copy(
                 exercise_sessions = if (shExercise.isNotEmpty()) shExercise else hcData.exercise_sessions,
                 energy_score = shEnergyScore,
