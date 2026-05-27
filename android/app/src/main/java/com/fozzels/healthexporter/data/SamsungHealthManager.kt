@@ -54,8 +54,15 @@ class SamsungHealthManager @Inject constructor(
 
     suspend fun requestPermissions(activity: Activity): Set<Permission> =
         withContext(Dispatchers.Main) {
-            val s = store ?: return@withContext emptySet()
-            runCatching { s.requestPermissions(PERMISSIONS, activity) }.getOrDefault(emptySet())
+            val s = store ?: run {
+                android.util.Log.w("SamsungHealth", "requestPermissions: store is null, Samsung Health not available")
+                return@withContext emptySet()
+            }
+            runCatching {
+                s.requestPermissions(PERMISSIONS, activity)
+            }.onFailure { e ->
+                android.util.Log.e("SamsungHealth", "requestPermissions failed: ${e::class.simpleName}: ${e.message}", e)
+            }.getOrDefault(emptySet())
         }
 
     suspend fun readSteps(startDate: LocalDate, endDate: LocalDate): List<StepsEntry> =
