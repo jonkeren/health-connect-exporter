@@ -1,6 +1,6 @@
 package com.fozzels.healthexporter.ui.viewmodel
 
-import android.app.Activity
+import android.content.Context
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -57,8 +57,8 @@ class PermissionsViewModel @Inject constructor(
         _grantedPermissions.value = granted
     }
 
-    suspend fun requestSamsungPermissions(activity: Activity) {
-        val granted = samsungHealthManager.requestPermissions(activity)
+    suspend fun requestSamsungPermissions(context: Context) {
+        val granted = samsungHealthManager.requestPermissions(context)
         _samsungAllGranted.value = granted.containsAll(SamsungHealthManager.PERMISSIONS)
     }
 }
