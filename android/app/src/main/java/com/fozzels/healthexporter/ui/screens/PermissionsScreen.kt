@@ -1,5 +1,6 @@
 package com.fozzels.healthexporter.ui.screens
 
+import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,11 +13,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fozzels.healthexporter.data.HealthConnectManager
 import com.fozzels.healthexporter.ui.viewmodel.PermissionsViewModel
+import kotlinx.coroutines.launch
 
 private val permissionLabels = mapOf(
     "android.permission.health.READ_HEALTH_DATA_HISTORY" to "Full History Access (data older than 30 days)",
@@ -39,6 +42,9 @@ private val permissionLabels = mapOf(
 @Composable
 fun PermissionsScreen(viewModel: PermissionsViewModel = hiltViewModel()) {
     val grantedPermissions by viewModel.grantedPermissions.collectAsState()
+    val samsungAllGranted by viewModel.samsungAllGranted.collectAsState()
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     val permLauncher = rememberLauncherForActivityResult(
         contract = viewModel.permissionsContract
@@ -46,93 +52,164 @@ fun PermissionsScreen(viewModel: PermissionsViewModel = hiltViewModel()) {
         viewModel.onPermissionsResult(granted)
     }
 
-    LaunchedEffect(Unit) { viewModel.refreshPermissions() }
+    LaunchedEffect(Unit) {
+        viewModel.refreshPermissions()
+        viewModel.refreshSamsungPermissions()
+    }
 
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 8.dp)
-        ) {
-            Icon(
-                Icons.Filled.HealthAndSafety,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(32.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                "Health Connect Permissions",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
+        item {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                Icon(
+                    Icons.Filled.HealthAndSafety,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Health Connect Permissions",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         if (!viewModel.isAvailable) {
-            Spacer(Modifier.height(16.dp))
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
-            ) {
-                Text(
-                    "Health Connect is not available on this device. Please install it from the Play Store.",
-                    modifier = Modifier.padding(16.dp),
-                    color = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-            return
-        }
-
-        Text(
-            "Grant access to your health data so the app can export it daily.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        val allGranted = grantedPermissions.containsAll(HealthConnectManager.PERMISSIONS)
-
-        if (allGranted) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Filled.Check, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(8.dp))
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                     Text(
-                        "All permissions granted!",
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        fontWeight = FontWeight.SemiBold
+                        "Health Connect is not available on this device. Please install it from the Play Store.",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
             }
         } else {
-            Button(
-                onClick = { permLauncher.launch(HealthConnectManager.PERMISSIONS) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp)
-            ) {
-                Text("Grant All Health Connect Permissions")
+            item {
+                Text(
+                    "Grant access to your health data so the app can export it daily.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
             }
-        }
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val allGranted = grantedPermissions.containsAll(HealthConnectManager.PERMISSIONS)
+
+            item {
+                if (allGranted) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "All Health Connect permissions granted!",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = { permLauncher.launch(HealthConnectManager.PERMISSIONS) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Grant All Health Connect Permissions")
+                    }
+                }
+            }
+
             items(HealthConnectManager.PERMISSIONS.sortedBy { permissionLabels[it] ?: it }) { permission ->
                 val isGranted = grantedPermissions.contains(permission)
                 val label = permissionLabels[permission] ?: permission.substringAfterLast(".")
                 PermissionRow(label = label, isGranted = isGranted)
+            }
+        }
+
+        // Samsung Health section
+        item {
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Samsung Health Permissions",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Required for GPS routes, Energy Score, Sleep Score, and richer exercise stats.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+
+        if (!viewModel.isSamsungAvailable) {
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                    Text(
+                        "Samsung Health is not installed or not available on this device.",
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            item {
+                if (samsungAllGranted) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "All Samsung Health permissions granted!",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                viewModel.requestSamsungPermissions(context as Activity)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Grant Samsung Health Permissions")
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PermissionRow(label = "Exercise Sessions (incl. GPS routes)", isGranted = samsungAllGranted)
+                    PermissionRow(label = "Sleep Score", isGranted = samsungAllGranted)
+                    PermissionRow(label = "Energy Score", isGranted = samsungAllGranted)
+                }
             }
         }
     }

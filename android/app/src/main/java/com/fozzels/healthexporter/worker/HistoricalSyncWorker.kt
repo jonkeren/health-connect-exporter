@@ -11,6 +11,7 @@ import androidx.work.*
 import com.fozzels.healthexporter.data.ExportRepository
 import com.fozzels.healthexporter.data.GoogleFitManager
 import com.fozzels.healthexporter.data.HealthConnectManager
+import com.fozzels.healthexporter.data.SamsungHealthManager
 import com.fozzels.healthexporter.data.SettingsRepository
 import com.fozzels.healthexporter.model.*
 import com.fozzels.healthexporter.service.DriveExportService
@@ -31,6 +32,7 @@ class HistoricalSyncWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters,
     private val healthConnectManager: HealthConnectManager,
+    private val samsungHealthManager: SamsungHealthManager,
     private val settingsRepository: SettingsRepository,
     private val exportRepository: ExportRepository,
     private val httpExportService: HttpExportService,
@@ -42,12 +44,10 @@ class HistoricalSyncWorker @AssistedInject constructor(
         const val WORK_NAME = "historical_sync"
         const val NOTIFICATION_ID = 1002
 
-        // Input data keys
         const val KEY_START_DATE = "start_date"
         const val KEY_END_DATE = "end_date"
         const val KEY_SELECTED_TYPES = "selected_types"
 
-        // Progress/output data keys
         const val PROGRESS_DAYS_PROCESSED = "days_processed"
         const val PROGRESS_TOTAL_DAYS = "total_days"
         const val PROGRESS_CURRENT_DATE = "current_date"
@@ -108,7 +108,6 @@ class HistoricalSyncWorker @AssistedInject constructor(
         val endDate = LocalDate.parse(endDateStr, DATE_FMT)
         val totalDays = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
 
-        // Use GoogleFitManager only if signed in (GPS fallback for Samsung Health workouts)
         val fitSignedIn = googleFitManager.isSignedIn()
         Log.d("HealthExporter", "GoogleFit isSignedIn=$fitSignedIn email=${googleFitManager.getSignedInEmail()}")
         val fitManager = googleFitManager.takeIf { fitSignedIn }
@@ -123,11 +122,9 @@ class HistoricalSyncWorker @AssistedInject constructor(
 
             val dateStr = currentDate.format(DATE_FMT)
 
-            // Report progress and update foreground notification
             setProgress(buildProgressData(daysProcessed, totalDays, dateStr, recordCounts, failedDates))
             setForeground(buildForegroundInfo("Historical sync: $daysProcessed/$totalDays days — $dateStr"))
 
-            // Skip days already exported (HTTP only — Drive deduplicates internally)
             val alreadyExists = if (settings.exportTarget == ExportTarget.HTTP) {
                 exportRepository.checkExistingExport(dateStr, settings.httpUrl, settings.httpToken)
             } else {
@@ -144,8 +141,22 @@ class HistoricalSyncWorker @AssistedInject constructor(
                     val sleepStartTime = currentDate.atTime(12, 0).atZone(zoneId).minusDays(1).toInstant()
                     val sleepEndTime = currentDate.atTime(12, 0).atZone(zoneId).toInstant()
 
-                    val healthData = healthConnectManager.readHealthDataForTypes(
+                    val hcData = healthConnectManager.readHealthDataForTypes(
                         startTime, endTime, selectedTypes, sleepStartTime, sleepEndTime, fitManager
+                    )
+
+                    // Samsung Health overlay: SH data takes priority over Health Connect
+                    val fetchAll = selectedTypes.isEmpty()
+                    val shExercise = if (fetchAll || "exercise_sessions" in selectedTypes)
+                        samsungHealthManager.readExerciseSessions(startTime, endTime) else emptyList()
+                    val shEnergyScore = if (fetchAll || "energy_score" in selectedTypes)
+                        samsungHealthManager.readEnergyScores(currentDate, currentDate) else emptyList()
+                    val shSleepScore = if (fetchAll || "sleep_score" in selectedTypes)
+                        samsungHealthManager.readSleepScores(startTime, endTime) else emptyList()
+                    val healthData = hcData.copy(
+                        exercise_sessions = if (shExercise.isNotEmpty()) shExercise else hcData.exercise_sessions,
+                        energy_score = shEnergyScore,
+                        sleep_score = shSleepScore
                     )
 
                     val exportPayload = HealthExportData(
@@ -156,7 +167,6 @@ class HistoricalSyncWorker @AssistedInject constructor(
                         data = healthData
                     )
 
-                    // Skip days with no data at all — don't upload empty shells
                     val totalRecordsToday = healthData.recordCounts().values.sum()
                     if (totalRecordsToday == 0) {
                         daysProcessed++
@@ -195,14 +205,11 @@ class HistoricalSyncWorker @AssistedInject constructor(
 
             daysProcessed++
             currentDate = currentDate.plusDays(1)
-            // Rate limit: small delay between days to avoid hammering HC or the server
             delay(100L)
         }
 
-        // Final progress update
         setProgress(buildProgressData(daysProcessed, totalDays, "", recordCounts, failedDates))
 
-        // Show summary notification
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val totalRecords = recordCounts.values.sum()
         val failedStr = if (failedDates.isNotEmpty()) ", ${failedDates.size} failed" else ""
@@ -247,4 +254,3 @@ class HistoricalSyncWorker @AssistedInject constructor(
         }
     }
 }
-

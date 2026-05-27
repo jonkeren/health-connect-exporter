@@ -9,6 +9,7 @@ import androidx.work.*
 import com.fozzels.healthexporter.data.ExportRepository
 import com.fozzels.healthexporter.data.GoogleFitManager
 import com.fozzels.healthexporter.data.HealthConnectManager
+import com.fozzels.healthexporter.data.SamsungHealthManager
 import com.fozzels.healthexporter.data.SettingsRepository
 import com.fozzels.healthexporter.model.*
 import com.fozzels.healthexporter.service.DriveExportService
@@ -24,6 +25,7 @@ class ExportWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted workerParams: WorkerParameters,
     private val healthConnectManager: HealthConnectManager,
+    private val samsungHealthManager: SamsungHealthManager,
     private val settingsRepository: SettingsRepository,
     private val exportRepository: ExportRepository,
     private val httpExportService: HttpExportService,
@@ -79,7 +81,6 @@ class ExportWorker @AssistedInject constructor(
         showNotification("Exporting health data for $dateStr...", ongoing = true)
 
         return try {
-            // Calculate time range for the export date
             val zoneId = ZoneId.systemDefault()
             val startTime = exportDate.atStartOfDay(zoneId).toInstant()
             val endTime = exportDate.plusDays(1).atStartOfDay(zoneId).toInstant()
@@ -89,12 +90,20 @@ class ExportWorker @AssistedInject constructor(
             val sleepStartTime = exportDate.atTime(12, 0).atZone(zoneId).minusDays(1).toInstant()
             val sleepEndTime = exportDate.atTime(12, 0).atZone(zoneId).toInstant()
 
-            // Pass GoogleFitManager only if signed in (provides GPS fallback for Samsung Health workouts)
             val fitManager = googleFitManager.takeIf { it.isSignedIn() }
 
-            // Read health data
-            val healthData = healthConnectManager.readHealthData(
+            val hcData = healthConnectManager.readHealthData(
                 startTime, endTime, sleepStartTime, sleepEndTime, fitManager
+            )
+
+            // Samsung Health overlay: SH data takes priority over Health Connect
+            val shExercise = samsungHealthManager.readExerciseSessions(startTime, endTime)
+            val shEnergyScore = samsungHealthManager.readEnergyScores(exportDate, exportDate)
+            val shSleepScore = samsungHealthManager.readSleepScores(startTime, endTime)
+            val healthData = hcData.copy(
+                exercise_sessions = if (shExercise.isNotEmpty()) shExercise else hcData.exercise_sessions,
+                energy_score = shEnergyScore,
+                sleep_score = shSleepScore
             )
 
             val exportPayload = HealthExportData(

@@ -14,5 +14,7 @@ enum class HealthDataType(val displayName: String, val key: String) {
     BODY_TEMPERATURE("Body Temperature", "body_temperature"),
     HYDRATION("Hydration", "hydration"),
     NUTRITION("Nutrition", "nutrition"),
-    EXERCISE_SESSIONS("Exercise Sessions", "exercise_sessions")
+    EXERCISE_SESSIONS("Exercise Sessions", "exercise_sessions"),
+    ENERGY_SCORE("Energy Score", "energy_score"),
+    SLEEP_SCORE("Sleep Score", "sleep_score")
 }

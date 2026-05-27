@@ -26,7 +26,9 @@ data class HealthDataPayload(
     val body_temperature: List<BodyTemperatureEntry> = emptyList(),
     val hydration: List<HydrationEntry> = emptyList(),
     val nutrition: List<NutritionEntry> = emptyList(),
-    val exercise_sessions: List<ExerciseSessionEntry> = emptyList()
+    val exercise_sessions: List<ExerciseSessionEntry> = emptyList(),
+    val energy_score: List<EnergyScoreEntry> = emptyList(),
+    val sleep_score: List<SleepScoreEntry> = emptyList()
 ) {
     fun recordCounts(): Map<String, Int> = mapOf(
         "steps" to steps.size,
@@ -42,7 +44,9 @@ data class HealthDataPayload(
         "body_temperature" to body_temperature.size,
         "hydration" to hydration.size,
         "nutrition" to nutrition.size,
-        "exercise_sessions" to exercise_sessions.size
+        "exercise_sessions" to exercise_sessions.size,
+        "energy_score" to energy_score.size,
+        "sleep_score" to sleep_score.size
     ).filter { it.value > 0 }
 }
 
@@ -156,5 +160,26 @@ data class ExerciseSessionEntry(
     val steps: Int? = null,
     val avgSpeedMs: Double? = null,
     val hasGps: Boolean = false,
-    val route: List<RoutePoint>? = null
+    val route: List<RoutePoint>? = null,
+    val vo2Max: Float? = null,
+    val altitudeGain: Float? = null,
+    val altitudeLoss: Float? = null,
+    val maxHeartRate: Float? = null,
+    val meanHeartRate: Float? = null,
+    val minHeartRate: Float? = null,
+    val maxSpeed: Float? = null
+)
+
+@Serializable
+data class EnergyScoreEntry(
+    val date: String,
+    val score: Float
+)
+
+@Serializable
+data class SleepScoreEntry(
+    val date: String,
+    val score: Int,
+    val start: String? = null,
+    val end: String? = null
 )
