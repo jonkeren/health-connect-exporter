@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fozzels.healthexporter.data.HealthConnectManager
+import com.fozzels.healthexporter.data.SamsungHealthManager
 import com.fozzels.healthexporter.ui.viewmodel.PermissionsViewModel
 
 private val permissionLabels = mapOf(
@@ -39,7 +40,8 @@ private val permissionLabels = mapOf(
 @Composable
 fun PermissionsScreen(viewModel: PermissionsViewModel = hiltViewModel()) {
     val grantedPermissions by viewModel.grantedPermissions.collectAsState()
-    val samsungAllGranted by viewModel.samsungAllGranted.collectAsState()
+    val samsungGrantedPermissions by viewModel.samsungGrantedPermissions.collectAsState()
+    val samsungAllGranted = samsungGrantedPermissions.containsAll(SamsungHealthManager.PERMISSIONS)
 
     val permLauncher = rememberLauncherForActivityResult(
         contract = viewModel.permissionsContract
@@ -203,9 +205,12 @@ fun PermissionsScreen(viewModel: PermissionsViewModel = hiltViewModel()) {
 
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    PermissionRow(label = "Exercise Sessions (incl. GPS routes)", isGranted = samsungAllGranted)
-                    PermissionRow(label = "Sleep Score", isGranted = samsungAllGranted)
-                    PermissionRow(label = "Energy Score", isGranted = samsungAllGranted)
+                    SamsungHealthManager.PERMISSION_LABELS.forEach { (permission, label) ->
+                        PermissionRow(
+                            label = label,
+                            isGranted = samsungGrantedPermissions.contains(permission)
+                        )
+                    }
                 }
             }
         }

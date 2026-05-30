@@ -2,6 +2,7 @@ package com.fozzels.healthexporter.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import com.fozzels.healthexporter.data.SamsungHealthManager
@@ -24,12 +25,16 @@ class SamsungHealthPermissionsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "onCreate — store available=${samsungHealthManager.isAvailable}")
 
         lifecycleScope.launch {
             val granted = runCatching {
                 samsungHealthManager.requestPermissionsInternal(this@SamsungHealthPermissionsActivity)
+            }.onFailure { e ->
+                Log.e(TAG, "requestPermissionsInternal threw", e)
             }.getOrDefault(emptySet())
 
+            Log.d(TAG, "Permission result: ${granted.size}/${SamsungHealthManager.PERMISSIONS.size} granted")
             val resultIntent = Intent().apply {
                 putParcelableArrayListExtra(EXTRA_GRANTED, ArrayList(granted))
             }
@@ -39,6 +44,7 @@ class SamsungHealthPermissionsActivity : ComponentActivity() {
     }
 
     companion object {
+        private const val TAG = "SamsungHPermActivity"
         const val EXTRA_GRANTED = "samsung_granted_permissions"
     }
 }

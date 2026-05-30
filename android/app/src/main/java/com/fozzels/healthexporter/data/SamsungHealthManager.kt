@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.activity.result.contract.ActivityResultContract
 import com.fozzels.healthexporter.model.*
 import com.fozzels.healthexporter.ui.SamsungHealthPermissionsActivity
@@ -32,21 +33,40 @@ class SamsungHealthManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private val store by lazy {
-        runCatching { HealthDataService.getStore(context) }.getOrNull()
+        runCatching { HealthDataService.getStore(context) }
+            .onFailure { Log.e(TAG, "Failed to get Samsung Health store", it) }
+            .getOrNull()
     }
 
     val isAvailable: Boolean get() = store != null
 
     companion object {
+        private const val TAG = "SamsungHealthManager"
+
+        private val PERM_EXERCISE      = Permission.of(DataTypes.EXERCISE, AccessType.READ)
+        private val PERM_SLEEP         = Permission.of(DataTypes.SLEEP, AccessType.READ)
+        private val PERM_ENERGY_SCORE  = Permission.of(DataTypes.ENERGY_SCORE, AccessType.READ)
+        private val PERM_STEPS         = Permission.of(DataTypes.STEPS, AccessType.READ)
+        private val PERM_HEART_RATE    = Permission.of(DataTypes.HEART_RATE, AccessType.READ)
+        private val PERM_BLOOD_OXYGEN  = Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ)
+        private val PERM_BODY_COMP     = Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ)
+        private val PERM_ACTIVITY_SUMM = Permission.of(DataTypes.ACTIVITY_SUMMARY, AccessType.READ)
+
         val PERMISSIONS: Set<Permission> = setOf(
-            Permission.of(DataTypes.EXERCISE, AccessType.READ),
-            Permission.of(DataTypes.SLEEP, AccessType.READ),
-            Permission.of(DataTypes.ENERGY_SCORE, AccessType.READ),
-            Permission.of(DataTypes.STEPS, AccessType.READ),
-            Permission.of(DataTypes.HEART_RATE, AccessType.READ),
-            Permission.of(DataTypes.BLOOD_OXYGEN, AccessType.READ),
-            Permission.of(DataTypes.BODY_COMPOSITION, AccessType.READ),
-            Permission.of(DataTypes.ACTIVITY_SUMMARY, AccessType.READ),
+            PERM_EXERCISE, PERM_SLEEP, PERM_ENERGY_SCORE, PERM_STEPS,
+            PERM_HEART_RATE, PERM_BLOOD_OXYGEN, PERM_BODY_COMP, PERM_ACTIVITY_SUMM,
+        )
+
+        /** Ordered map of every requested permission to its human-readable label. */
+        val PERMISSION_LABELS: Map<Permission, String> = linkedMapOf(
+            PERM_EXERCISE      to "Exercise Sessions (incl. GPS routes)",
+            PERM_SLEEP         to "Sleep",
+            PERM_ENERGY_SCORE  to "Energy Score",
+            PERM_STEPS         to "Steps",
+            PERM_HEART_RATE    to "Heart Rate",
+            PERM_BLOOD_OXYGEN  to "Blood Oxygen / SpO2",
+            PERM_BODY_COMP     to "Body Composition (weight, fat %, muscle, BMI)",
+            PERM_ACTIVITY_SUMM to "Activity Summary",
         )
     }
 
@@ -79,8 +99,14 @@ class SamsungHealthManager @Inject constructor(
 
     suspend fun requestPermissionsInternal(activity: Activity): Set<Permission> =
         withContext(Dispatchers.Main) {
-            val s = store ?: return@withContext emptySet()
-            s.requestPermissions(PERMISSIONS, activity)
+            val s = store ?: run {
+                Log.e(TAG, "requestPermissionsInternal: store is null — Samsung Health unavailable")
+                return@withContext emptySet()
+            }
+            Log.d(TAG, "requestPermissionsInternal: calling SDK requestPermissions for ${PERMISSIONS.size} permissions")
+            runCatching { s.requestPermissions(PERMISSIONS, activity) }
+                .onFailure { Log.e(TAG, "SDK requestPermissions threw", it) }
+                .getOrDefault(emptySet())
         }
 
     suspend fun readSteps(startDate: LocalDate, endDate: LocalDate): List<StepsEntry> =

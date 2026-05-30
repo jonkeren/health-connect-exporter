@@ -22,8 +22,8 @@ class PermissionsViewModel @Inject constructor(
     private val _grantedPermissions = MutableStateFlow<Set<String>>(emptySet())
     val grantedPermissions: StateFlow<Set<String>> = _grantedPermissions.asStateFlow()
 
-    private val _samsungAllGranted = MutableStateFlow(false)
-    val samsungAllGranted: StateFlow<Boolean> = _samsungAllGranted.asStateFlow()
+    private val _samsungGrantedPermissions = MutableStateFlow<Set<Permission>>(emptySet())
+    val samsungGrantedPermissions: StateFlow<Set<Permission>> = _samsungGrantedPermissions.asStateFlow()
 
     val isAvailable: Boolean get() = healthConnectManager.isAvailable
     val isSamsungAvailable: Boolean get() = samsungHealthManager.isAvailable
@@ -50,8 +50,7 @@ class PermissionsViewModel @Inject constructor(
     fun refreshSamsungPermissions() {
         viewModelScope.launch {
             if (samsungHealthManager.isAvailable) {
-                val granted = samsungHealthManager.getGrantedPermissions()
-                _samsungAllGranted.value = granted.containsAll(SamsungHealthManager.PERMISSIONS)
+                _samsungGrantedPermissions.value = samsungHealthManager.getGrantedPermissions()
             }
         }
     }
@@ -61,6 +60,6 @@ class PermissionsViewModel @Inject constructor(
     }
 
     fun onSamsungPermissionsResult(granted: Set<Permission>) {
-        _samsungAllGranted.value = granted.containsAll(SamsungHealthManager.PERMISSIONS)
+        _samsungGrantedPermissions.value = granted
     }
 }
