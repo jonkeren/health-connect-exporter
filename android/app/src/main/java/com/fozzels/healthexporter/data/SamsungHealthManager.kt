@@ -227,10 +227,10 @@ class SamsungHealthManager @Inject constructor(
                     val sessions = point.getValue(DataType.SleepType.SESSIONS) as? List<SleepSession>
                         ?: return@flatMap emptyList<SleepEntry>()
                     sessions.flatMap { session ->
-                        if (session.stages.isEmpty()) {
+                        if (session.stages.isNullOrEmpty()) {
                             listOf(SleepEntry(start = session.startTime.toString(), end = session.endTime.toString()))
                         } else {
-                            session.stages.map { stage ->
+                            session.stages!!.map { stage ->
                                 SleepEntry(
                                     start = stage.startTime.toString(),
                                     end = stage.endTime.toString(),
