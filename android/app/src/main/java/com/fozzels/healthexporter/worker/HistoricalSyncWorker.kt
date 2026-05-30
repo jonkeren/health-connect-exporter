@@ -175,7 +175,7 @@ class HistoricalSyncWorker @AssistedInject constructor(
                         calories = if (shCalories.isNotEmpty()) shCalories else hcData.calories,
                         distance = if (shDistance.isNotEmpty()) shDistance else hcData.distance,
                         spo2 = if (shSpO2.isNotEmpty()) shSpO2 else hcData.spo2,
-                        exercise_sessions = if (shExercise.isNotEmpty()) shExercise else hcData.exercise_sessions,
+                        exercise_sessions = mergeExerciseSessions(shExercise, hcData.exercise_sessions),
                         energy_score = shEnergyScore,
                         sleep_score = shSleepScore
                     )
