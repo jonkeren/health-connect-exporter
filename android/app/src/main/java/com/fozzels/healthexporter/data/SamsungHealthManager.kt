@@ -193,10 +193,11 @@ class SamsungHealthManager @Inject constructor(
                         body_fat_pct = (point.getValue(DataType.BodyCompositionType.BODY_FAT) as? Float)?.toDouble(),
                         muscle_mass_kg = (point.getValue(DataType.BodyCompositionType.SKELETAL_MUSCLE_MASS) as? Float)?.toDouble(),
                         body_water_pct = (point.getValue(DataType.BodyCompositionType.TOTAL_BODY_WATER) as? Float)?.toDouble(),
-                        bone_mass_kg = (point.getValue(DataType.BodyCompositionType.BONE_MASS) as? Float)?.toDouble(),
-                        bmr_kcal = (point.getValue(DataType.BodyCompositionType.BASAL_METABOLIC_RATE) as? Float)?.toDouble(),
+                        bone_mass_kg = null,
+                        bmr_kcal = (point.getValue(DataType.BodyCompositionType.BASAL_METABOLIC_RATE) as? Int)?.toDouble(),
                         visceral_fat = null,
-                        bmi = kgD / (1.94 * 1.94)
+                        bmi = (point.getValue(DataType.BodyCompositionType.BODY_MASS_INDEX) as? Float)?.toDouble()
+                            ?: (kgD / (1.94 * 1.94))
                     )
                 }
             }.getOrDefault(emptyList())
