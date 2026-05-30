@@ -56,6 +56,12 @@
             </intent-filter>
         </activity>
 
+        <!-- Transparent bridge that drives the Samsung Health permission request -->
+        <activity
+            android:name=".ui.SamsungHealthPermissionsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Transparent" />
+
         <!-- Required for Health Connect to display permission rationale -->
         <activity-alias
             android:name="ViewPermissionUsageActivity"

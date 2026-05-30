@@ -1,6 +1,5 @@
 package com.fozzels.healthexporter.ui.screens
 
-import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,13 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.fozzels.healthexporter.data.HealthConnectManager
 import com.fozzels.healthexporter.ui.viewmodel.PermissionsViewModel
-import kotlinx.coroutines.launch
 
 private val permissionLabels = mapOf(
     "android.permission.health.READ_HEALTH_DATA_HISTORY" to "Full History Access (data older than 30 days)",
@@ -39,19 +36,21 @@ private val permissionLabels = mapOf(
     "android.permission.health.READ_EXERCISE" to "Exercise Sessions"
 )
 
-
-
 @Composable
 fun PermissionsScreen(viewModel: PermissionsViewModel = hiltViewModel()) {
     val grantedPermissions by viewModel.grantedPermissions.collectAsState()
     val samsungAllGranted by viewModel.samsungAllGranted.collectAsState()
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     val permLauncher = rememberLauncherForActivityResult(
         contract = viewModel.permissionsContract
     ) { granted ->
         viewModel.onPermissionsResult(granted)
+    }
+
+    val samsungPermLauncher = rememberLauncherForActivityResult(
+        contract = viewModel.samsungPermissionsContract
+    ) { granted ->
+        viewModel.onSamsungPermissionsResult(granted)
     }
 
     LaunchedEffect(Unit) {
@@ -194,11 +193,7 @@ fun PermissionsScreen(viewModel: PermissionsViewModel = hiltViewModel()) {
                     }
                 } else {
                     Button(
-                        onClick = {
-                            scope.launch {
-                                viewModel.requestSamsungPermissions(context)
-                            }
-                        },
+                        onClick = { samsungPermLauncher.launch(Unit) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Grant Samsung Health Permissions")

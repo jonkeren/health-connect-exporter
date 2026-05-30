@@ -1,11 +1,11 @@
 package com.fozzels.healthexporter.ui.viewmodel
 
-import android.content.Context
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fozzels.healthexporter.data.HealthConnectManager
 import com.fozzels.healthexporter.data.SamsungHealthManager
+import com.samsung.android.sdk.health.data.permission.Permission
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +30,9 @@ class PermissionsViewModel @Inject constructor(
 
     val permissionsContract: ActivityResultContract<Set<String>, Set<String>> =
         healthConnectManager.requestPermissionsActivityContract()
+
+    val samsungPermissionsContract: ActivityResultContract<Unit, Set<Permission>> =
+        samsungHealthManager.permissionContract()
 
     init {
         refreshPermissions()
@@ -57,8 +60,7 @@ class PermissionsViewModel @Inject constructor(
         _grantedPermissions.value = granted
     }
 
-    suspend fun requestSamsungPermissions(context: Context) {
-        val granted = samsungHealthManager.requestPermissions(context)
+    fun onSamsungPermissionsResult(granted: Set<Permission>) {
         _samsungAllGranted.value = granted.containsAll(SamsungHealthManager.PERMISSIONS)
     }
 }

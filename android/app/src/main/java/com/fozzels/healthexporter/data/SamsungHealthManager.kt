@@ -2,7 +2,11 @@ package com.fozzels.healthexporter.data
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContract
 import com.fozzels.healthexporter.model.*
+import com.fozzels.healthexporter.ui.SamsungHealthPermissionsActivity
 import com.samsung.android.sdk.health.data.HealthDataService
 import com.samsung.android.sdk.health.data.data.entries.ExerciseSession
 import com.samsung.android.sdk.health.data.data.entries.HeartRate
@@ -52,33 +56,31 @@ class SamsungHealthManager @Inject constructor(
             runCatching { s.getGrantedPermissions(PERMISSIONS) }.getOrDefault(emptySet())
         }
 
-    /**
-     * Launch Samsung Health permissions screen.
-     * Tries multiple strategies to get a valid Activity reference.
-     */
-    suspend fun requestPermissions(context: Context): Set<Permission> =
+    fun permissionContract(): ActivityResultContract<Unit, Set<Permission>> =
+        object : ActivityResultContract<Unit, Set<Permission>>() {
+            override fun createIntent(context: Context, input: Unit): Intent =
+                Intent(context, SamsungHealthPermissionsActivity::class.java)
+
+            override fun parseResult(resultCode: Int, intent: Intent?): Set<Permission> {
+                if (resultCode != Activity.RESULT_OK || intent == null) return emptySet()
+                val list: ArrayList<Permission>? =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        intent.getParcelableArrayListExtra(
+                            SamsungHealthPermissionsActivity.EXTRA_GRANTED,
+                            Permission::class.java
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        intent.getParcelableArrayListExtra(SamsungHealthPermissionsActivity.EXTRA_GRANTED)
+                    }
+                return list?.toSet() ?: emptySet()
+            }
+        }
+
+    suspend fun requestPermissionsInternal(activity: Activity): Set<Permission> =
         withContext(Dispatchers.Main) {
-            val s = store ?: run {
-                android.util.Log.w("SamsungHealth", "requestPermissions: store is null")
-                return@withContext emptySet()
-            }
-            // Strategy: find Activity from context chain
-            var ctx: android.content.Context = context
-            var activity: Activity? = null
-            while (ctx is android.content.ContextWrapper) {
-                if (ctx is Activity) { activity = ctx; break }
-                ctx = ctx.baseContext
-            }
-            if (activity == null) {
-                android.util.Log.e("SamsungHealth", "requestPermissions: could not find Activity in context chain")
-                return@withContext emptySet()
-            }
-            android.util.Log.d("SamsungHealth", "requestPermissions: using activity ${activity.javaClass.simpleName}")
-            runCatching {
-                s.requestPermissions(PERMISSIONS, activity)
-            }.onFailure { e ->
-                android.util.Log.e("SamsungHealth", "requestPermissions failed: ${e::class.simpleName}: ${e.message}", e)
-            }.getOrDefault(emptySet())
+            val s = store ?: return@withContext emptySet()
+            s.requestPermissions(PERMISSIONS, activity)
         }
 
     suspend fun readSteps(startDate: LocalDate, endDate: LocalDate): List<StepsEntry> =
@@ -225,10 +227,10 @@ class SamsungHealthManager @Inject constructor(
                     val sessions = point.getValue(DataType.SleepType.SESSIONS) as? List<SleepSession>
                         ?: return@flatMap emptyList<SleepEntry>()
                     sessions.flatMap { session ->
-                        if (session.stages.isNullOrEmpty()) {
+                        if (session.stages.isEmpty()) {
                             listOf(SleepEntry(start = session.startTime.toString(), end = session.endTime.toString()))
                         } else {
-                            session.stages!!.map { stage ->
+                            session.stages.map { stage ->
                                 SleepEntry(
                                     start = stage.startTime.toString(),
                                     end = stage.endTime.toString(),
