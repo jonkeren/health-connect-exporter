@@ -102,7 +102,7 @@ class ExportWorker @AssistedInject constructor(
             val shCalories = samsungHealthManager.readCalories(exportDate, exportDate)
             val shDistance = samsungHealthManager.readDistance(exportDate, exportDate)
             val shSpO2 = samsungHealthManager.readSpO2(startTime, endTime)
-            val shWeight = samsungHealthManager.readWeight(startTime, endTime)
+            val shBodyComp = samsungHealthManager.readBodyComposition(startTime, endTime)
             val shSleep = samsungHealthManager.readSleep(sleepStartTime, sleepEndTime)
             val shExercise = samsungHealthManager.readExerciseSessions(startTime, endTime)
             val shEnergyScore = samsungHealthManager.readEnergyScores(exportDate, exportDate)
@@ -111,7 +111,7 @@ class ExportWorker @AssistedInject constructor(
                 steps = if (shSteps.isNotEmpty()) shSteps else hcData.steps,
                 heart_rate = if (shHeartRate.isNotEmpty()) shHeartRate else hcData.heart_rate,
                 sleep = if (shSleep.isNotEmpty()) shSleep else hcData.sleep,
-                weight = if (shWeight.isNotEmpty()) shWeight else hcData.weight,
+                weight = if (shBodyComp.isNotEmpty()) shBodyComp else hcData.weight,
                 calories = if (shCalories.isNotEmpty()) shCalories else hcData.calories,
                 distance = if (shDistance.isNotEmpty()) shDistance else hcData.distance,
                 spo2 = if (shSpO2.isNotEmpty()) shSpO2 else hcData.spo2,

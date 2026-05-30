@@ -34,7 +34,9 @@ private val permissionLabels = mapOf(
     "android.permission.health.READ_BODY_TEMPERATURE" to "Body Temperature",
     "android.permission.health.READ_HYDRATION" to "Hydration",
     "android.permission.health.READ_NUTRITION" to "Nutrition",
-    "android.permission.health.READ_EXERCISE" to "Exercise Sessions"
+    "android.permission.health.READ_EXERCISE" to "Exercise Sessions",
+    "android.permission.health.READ_BODY_FAT" to "Body Fat %",
+    "android.permission.health.READ_BASAL_METABOLIC_RATE" to "Basal Metabolic Rate (BMR)"
 )
 
 @Composable

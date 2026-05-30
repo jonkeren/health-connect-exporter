@@ -36,6 +36,8 @@ class HealthConnectManager @Inject constructor(
             HealthPermission.getReadPermission(SleepSessionRecord::class),
             HealthPermission.getReadPermission(BloodPressureRecord::class),
             HealthPermission.getReadPermission(WeightRecord::class),
+            HealthPermission.getReadPermission(BodyFatRecord::class),
+            HealthPermission.getReadPermission(BasalMetabolicRateRecord::class),
             HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
             HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
             HealthPermission.getReadPermission(DistanceRecord::class),
@@ -241,9 +243,35 @@ class HealthConnectManager @Inject constructor(
             }
     } catch (e: Exception) { emptyList() }
 
+    private suspend fun readBodyFat(timeRange: TimeRangeFilter): List<Pair<java.time.Instant, Double>> = try {
+        healthConnectClient.readRecords(ReadRecordsRequest(BodyFatRecord::class, timeRange))
+            .records.map { r -> r.time to r.percentage.value }
+    } catch (e: Exception) { emptyList() }
+
+    private suspend fun readBmr(timeRange: TimeRangeFilter): List<Pair<java.time.Instant, Double>> = try {
+        healthConnectClient.readRecords(ReadRecordsRequest(BasalMetabolicRateRecord::class, timeRange))
+            .records.map { r -> r.time to r.basalMetabolicRate.inKilocaloriesPerDay }
+    } catch (e: Exception) { emptyList() }
+
     private suspend fun readWeight(timeRange: TimeRangeFilter): List<WeightEntry> = try {
-        healthConnectClient.readRecords(ReadRecordsRequest(WeightRecord::class, timeRange))
-            .records.map { r -> WeightEntry(time = r.time.toString(), kg = r.weight.inKilograms) }
+        val weights = healthConnectClient.readRecords(ReadRecordsRequest(WeightRecord::class, timeRange)).records
+        val bodyFats = readBodyFat(timeRange)
+        val bmrs = readBmr(timeRange)
+        weights.map { r ->
+            val epochSec = r.time.epochSecond
+            val kgD = r.weight.inKilograms
+            val fat = bodyFats.minByOrNull { kotlin.math.abs(it.first.epochSecond - epochSec) }
+                ?.takeIf { kotlin.math.abs(it.first.epochSecond - epochSec) <= 3600 }?.second
+            val bmr = bmrs.minByOrNull { kotlin.math.abs(it.first.epochSecond - epochSec) }
+                ?.takeIf { kotlin.math.abs(it.first.epochSecond - epochSec) <= 3600 }?.second
+            WeightEntry(
+                time = r.time.toString(),
+                kg = kgD,
+                body_fat_pct = fat,
+                bmr_kcal = bmr,
+                bmi = kgD / (1.94 * 1.94)
+            )
+        }
     } catch (e: Exception) { emptyList() }
 
     private suspend fun readCalories(timeRange: TimeRangeFilter): List<CaloriesEntry> = try {

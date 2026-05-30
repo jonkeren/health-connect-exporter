@@ -174,7 +174,7 @@ class SamsungHealthManager @Inject constructor(
             }.getOrDefault(emptyList())
         }
 
-    suspend fun readWeight(startTime: Instant, endTime: Instant): List<WeightEntry> =
+    suspend fun readBodyComposition(startTime: Instant, endTime: Instant): List<WeightEntry> =
         withContext(Dispatchers.IO) {
             val s = store ?: return@withContext emptyList()
             runCatching {
@@ -186,7 +186,18 @@ class SamsungHealthManager @Inject constructor(
                 response.dataList.mapNotNull { point ->
                     val kg = point.getValue(DataType.BodyCompositionType.WEIGHT) as? Float
                         ?: return@mapNotNull null
-                    WeightEntry(time = point.startTime.toString(), kg = kg.toDouble())
+                    val kgD = kg.toDouble()
+                    WeightEntry(
+                        time = point.startTime.toString(),
+                        kg = kgD,
+                        body_fat_pct = (point.getValue(DataType.BodyCompositionType.BODY_FAT) as? Float)?.toDouble(),
+                        muscle_mass_kg = (point.getValue(DataType.BodyCompositionType.SKELETAL_MUSCLE_MASS) as? Float)?.toDouble(),
+                        body_water_pct = (point.getValue(DataType.BodyCompositionType.TOTAL_BODY_WATER) as? Float)?.toDouble(),
+                        bone_mass_kg = (point.getValue(DataType.BodyCompositionType.BONE_MASS) as? Float)?.toDouble(),
+                        bmr_kcal = (point.getValue(DataType.BodyCompositionType.BASAL_METABOLIC_RATE) as? Float)?.toDouble(),
+                        visceral_fat = null,
+                        bmi = kgD / (1.94 * 1.94)
+                    )
                 }
             }.getOrDefault(emptyList())
         }

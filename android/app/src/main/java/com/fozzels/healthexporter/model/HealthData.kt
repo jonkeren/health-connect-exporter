@@ -81,7 +81,14 @@ data class BloodPressureEntry(
 @Serializable
 data class WeightEntry(
     val time: String,
-    val kg: Double
+    val kg: Double,
+    val body_fat_pct: Double? = null,
+    val muscle_mass_kg: Double? = null,
+    val body_water_pct: Double? = null,
+    val bone_mass_kg: Double? = null,
+    val bmr_kcal: Double? = null,
+    val visceral_fat: Double? = null,
+    val bmi: Double? = null
 )
 
 @Serializable

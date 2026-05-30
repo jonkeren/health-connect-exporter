@@ -157,8 +157,8 @@ class HistoricalSyncWorker @AssistedInject constructor(
                         samsungHealthManager.readDistance(currentDate, currentDate) else emptyList()
                     val shSpO2 = if (fetchAll || "spo2" in selectedTypes)
                         samsungHealthManager.readSpO2(startTime, endTime) else emptyList()
-                    val shWeight = if (fetchAll || "weight" in selectedTypes)
-                        samsungHealthManager.readWeight(startTime, endTime) else emptyList()
+                    val shBodyComp = if (fetchAll || "weight" in selectedTypes)
+                        samsungHealthManager.readBodyComposition(startTime, endTime) else emptyList()
                     val shSleep = if (fetchAll || "sleep" in selectedTypes)
                         samsungHealthManager.readSleep(sleepStartTime, sleepEndTime) else emptyList()
                     val shExercise = if (fetchAll || "exercise_sessions" in selectedTypes)
@@ -171,7 +171,7 @@ class HistoricalSyncWorker @AssistedInject constructor(
                         steps = if (shSteps.isNotEmpty()) shSteps else hcData.steps,
                         heart_rate = if (shHeartRate.isNotEmpty()) shHeartRate else hcData.heart_rate,
                         sleep = if (shSleep.isNotEmpty()) shSleep else hcData.sleep,
-                        weight = if (shWeight.isNotEmpty()) shWeight else hcData.weight,
+                        weight = if (shBodyComp.isNotEmpty()) shBodyComp else hcData.weight,
                         calories = if (shCalories.isNotEmpty()) shCalories else hcData.calories,
                         distance = if (shDistance.isNotEmpty()) shDistance else hcData.distance,
                         spo2 = if (shSpO2.isNotEmpty()) shSpO2 else hcData.spo2,
