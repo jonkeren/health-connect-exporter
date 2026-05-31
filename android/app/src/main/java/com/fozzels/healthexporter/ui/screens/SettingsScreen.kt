@@ -2,9 +2,11 @@ package com.fozzels.healthexporter.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -12,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -329,6 +332,33 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                            OutlinedButton(
+                                onClick = viewModel::testFitConnection,
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !uiState.isTestingFit
+                            ) {
+                                if (uiState.isTestingFit) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Testing...")
+                                } else {
+                                    Text("Test GPS connection")
+                                }
+                            }
+                            uiState.fitTestResult?.let { result ->
+                                Text(
+                                    result,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontFamily = FontFamily.Monospace,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            MaterialTheme.colorScheme.surfaceVariant,
+                                            shape = RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(8.dp)
+                                )
+                            }
                         }
                     }
                 }

@@ -54,6 +54,66 @@ class GoogleFitManager @Inject constructor(
 
     fun getSignedInEmail(): String? = GoogleSignIn.getLastSignedInAccount(context)?.email
 
+    /**
+     * Diagnostic test: checks token acquisition and lists available location datasources.
+     * Returns a human-readable result string for display in the UI.
+     */
+    suspend fun testConnection(): String = withContext(Dispatchers.IO) {
+        val account = GoogleSignIn.getLastSignedInAccount(context)
+            ?: return@withContext "❌ No signed-in account found"
+        val androidAccount = account.account
+            ?: return@withContext "❌ Account has no Android account object"
+
+        val sb = StringBuilder()
+        sb.appendLine("Account: ${account.email}")
+
+        val token = try {
+            GoogleAuthUtil.getToken(context, androidAccount, FITNESS_SCOPE)
+        } catch (e: Exception) {
+            return@withContext "❌ Token fetch failed: ${e.javaClass.simpleName}: ${e.message}"
+        }
+        sb.appendLine("✓ Token acquired (${token.take(12)}...)")
+
+        // List all datasources
+        try {
+            val req = Request.Builder()
+                .url("https://www.googleapis.com/fitness/v1/users/me/dataSources")
+                .header("Authorization", "Bearer $token")
+                .get()
+                .build()
+            val resp = okHttpClient.newCall(req).execute()
+            val body = resp.body?.string()
+            resp.close()
+
+            if (!resp.isSuccessful) {
+                sb.appendLine("❌ DataSources API: HTTP ${resp.code}")
+                if (body != null) sb.appendLine(body.take(300))
+            } else {
+                val root = org.json.JSONObject(body ?: "{}")
+                val sources = root.optJSONArray("dataSource")
+                val total = sources?.length() ?: 0
+                sb.appendLine("✓ DataSources API OK — $total sources total")
+                var locationCount = 0
+                if (sources != null) {
+                    for (i in 0 until sources.length()) {
+                        val s = sources.getJSONObject(i)
+                        val id = s.optString("dataStreamId")
+                        val typeName = s.optJSONObject("dataType")?.optString("name") ?: ""
+                        if ("location" in id.lowercase() || "location" in typeName.lowercase()) {
+                            sb.appendLine("  📍 $id")
+                            locationCount++
+                        }
+                    }
+                }
+                if (locationCount == 0) sb.appendLine("⚠️ No location datasources found")
+            }
+        } catch (e: Exception) {
+            sb.appendLine("❌ DataSources request failed: ${e.message}")
+        }
+
+        sb.toString().trimEnd()
+    }
+
     suspend fun getRouteForSession(startTimeMs: Long, endTimeMs: Long): List<RoutePoint>? =
         withContext(Dispatchers.IO) {
             try {

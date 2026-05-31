@@ -36,7 +36,9 @@ data class SettingsUiState(
     val isLoadingFolders: Boolean = false,
     val showFolderPicker: Boolean = false,
     val fitAccountEmail: String = "",
-    val isConnectingFit: Boolean = false
+    val isConnectingFit: Boolean = false,
+    val fitTestResult: String? = null,
+    val isTestingFit: Boolean = false
 )
 
 @HiltViewModel
@@ -155,6 +157,14 @@ class SettingsViewModel @Inject constructor(
             _uiState.update {
                 it.copy(fitAccountEmail = "", snackbarMessage = "Google Fit disconnected")
             }
+        }
+    }
+
+    fun testFitConnection() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTestingFit = true, fitTestResult = null) }
+            val result = googleFitManager.testConnection()
+            _uiState.update { it.copy(isTestingFit = false, fitTestResult = result) }
         }
     }
 
