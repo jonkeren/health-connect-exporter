@@ -134,8 +134,12 @@ class GoogleFitManager @Inject constructor(
                 val startNs = startTimeMs * 1_000_000L
                 val endNs   = endTimeMs   * 1_000_000L
 
-                // Try each candidate datasource until we get points
-                for (datasource in LOCATION_DATASOURCES) {
+                // Build candidate list: fixed known sources first, then dynamic discovery
+                val dynamicSources = fetchAllLocationDatasourceIds(token)
+                val allSources = (LOCATION_DATASOURCES + dynamicSources).distinct()
+                Log.d(TAG, "Trying ${allSources.size} datasources (${dynamicSources.size} dynamic)")
+
+                for (datasource in allSources) {
                     val url = "https://www.googleapis.com/fitness/v1/users/me/dataSources/" +
                             "$datasource/datasets/$startNs-$endNs"
 
@@ -170,8 +174,7 @@ class GoogleFitManager @Inject constructor(
                     Log.d(TAG, "Datasource $datasource returned 0 points")
                 }
 
-                // Nothing found — log available location datasources for debugging
-                logAvailableDatasources(token, startNs, endNs)
+                Log.w(TAG, "No GPS points found in any of ${allSources.size} datasources")
                 null
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get Fit route", e)
@@ -179,9 +182,9 @@ class GoogleFitManager @Inject constructor(
             }
         }
 
-    /** Logs all available datasources that contain location data (for debugging empty results). */
-    private fun logAvailableDatasources(token: String, startNs: Long, endNs: Long) {
-        try {
+    /** Returns all location datasource IDs available for this account. */
+    private fun fetchAllLocationDatasourceIds(token: String): List<String> {
+        return try {
             val req = Request.Builder()
                 .url("https://www.googleapis.com/fitness/v1/users/me/dataSources")
                 .header("Authorization", "Bearer $token")
@@ -190,22 +193,27 @@ class GoogleFitManager @Inject constructor(
             val resp = okHttpClient.newCall(req).execute()
             val body = resp.body?.string()
             resp.close()
-            if (body.isNullOrBlank()) return
+            if (body.isNullOrBlank()) return emptyList()
             val root = JSONObject(body)
-            val sources = root.optJSONArray("dataSource") ?: return
-            Log.d(TAG, "Available datasources (${sources.length()} total):")
+            val sources = root.optJSONArray("dataSource") ?: return emptyList()
+            val ids = mutableListOf<String>()
             for (i in 0 until sources.length()) {
                 val s = sources.getJSONObject(i)
                 val id = s.optString("dataStreamId")
                 val typeName = s.optJSONObject("dataType")?.optString("name") ?: ""
                 if ("location" in id.lowercase() || "location" in typeName.lowercase()) {
-                    Log.d(TAG, "  [LOCATION] $id  ($typeName)")
+                    Log.d(TAG, "[LOCATION datasource] $id ($typeName)")
+                    ids.add(id)
                 }
             }
+            ids
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to list datasources: ${e.message}")
+            Log.w(TAG, "Failed to fetch datasource list: ${e.message}")
+            emptyList()
         }
     }
+
+
 
     private fun parseLocationDataset(json: String): List<RoutePoint>? {
         return try {
